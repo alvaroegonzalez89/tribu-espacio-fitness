@@ -188,8 +188,8 @@ tr:hover td{background:rgba(255,255,255,0.01);}
   .search-wrap input{width:100%!important;}.search-wrap{width:100%;}
   th,td{padding:9px 10px;font-size:12px;}
   .frow{grid-template-columns:1fr;}
-  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid #1a1a1a;z-index:200;padding:8px 0 14px;}
-  .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0;font-size:9px;color:#444;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;transition:color 0.15s;position:relative;}
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid #1a1a1a;z-index:200;padding:8px 0 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .bn-item{flex:1 0 auto;min-width:62px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 6px;font-size:8.5px;color:#444;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;transition:color 0.15s;position:relative;}
   .bn-item.active{color:var(--accent);}
   .bn-icon{font-size:20px;line-height:1;}
   .bn-badge{position:absolute;top:0;right:50%;transform:translateX(10px);background:var(--accent);color:#0a0a0a;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;}
@@ -243,7 +243,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     <div class="nav-item" onclick="navTo('dashboard')"><span class="ni">◈</span> Panel</div>
     <div class="nav-item" onclick="navTo('alumnos')"><span class="ni">◉</span> Socios</div>
     <div class="nav-item" onclick="navTo('cuotas')"><span class="ni">◎</span> Cuotas</div>
-    <div class="nav-item" id="nav-prospectos" onclick="navTo('prospectos')"><span class="ni">🎯</span> Prospectos <span class="nav-badge" id="badge-prospectos" style="display:none">0</span></div>
+    <div class="nav-item" id="nav-prospectos" onclick="navTo('prospectos')"><span class="ni">📝</span> Formulario <span class="nav-badge" id="badge-prospectos" style="display:none">0</span></div>
     <div class="nav-item" onclick="navTo('horarios')"><span class="ni">🗓</span> Horarios</div>
     <div class="nav-item" onclick="navTo('config')"><span class="ni">⚙</span> Configuración</div>
     <div class="sb-footer"><span>v2.0 · Tribu</span><button class="sb-logout" onclick="doLogout()">Salir</button></div>
@@ -257,8 +257,9 @@ tr:hover td{background:rgba(255,255,255,0.01);}
   <div class="bn-item" onclick="navTo('dashboard')"><span class="bn-icon">◈</span>Panel</div>
   <div class="bn-item" onclick="navTo('alumnos')"><span class="bn-icon">👥</span>Socios</div>
   <div class="bn-item" onclick="navTo('cuotas')"><span class="bn-icon">📅</span>Cuotas</div>
-  <div class="bn-item" onclick="navTo('prospectos')"><span class="bn-icon">🎯</span>Prospects<span class="bn-badge" id="bn-badge" style="display:none">0</span></div>
+  <div class="bn-item" onclick="navTo('prospectos')"><span class="bn-icon">📝</span>Formulario<span class="bn-badge" id="bn-badge" style="display:none">0</span></div>
   <div class="bn-item" onclick="navTo('horarios')"><span class="bn-icon">🗓</span>Horarios</div>
+  <div class="bn-item" onclick="navTo('config')"><span class="bn-icon">⚙</span>Config</div>
 </nav>
 
 <!-- MODALES -->
@@ -280,6 +281,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
       </div>
       <div class="fg"><label class="fl">Monto ($)</label><input class="fi" type="number" id="f-monto" placeholder="0"/></div>
     </div>
+    <div id="horarios-socio-wrap"></div>
     <div class="fg"><div class="tog-wrap"><button class="tog on" id="tog-activo" onclick="toggleActivo()"></button><span id="tog-label">Socio activo</span></div></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
@@ -295,36 +297,6 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="document.getElementById('modal-del').style.display='none'">Cancelar</button>
       <button class="btn btn-danger" onclick="confirmarDelete()">Sí, eliminar</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-bg" id="modal-horario" style="display:none;">
-  <div class="modal-box">
-    <div class="modal-title" id="modal-horario-titulo">Asignar horario al socio</div>
-    <input type="hidden" id="h-id"/>
-    <div class="frow">
-      <div class="fg"><label class="fl">Día</label>
-        <select class="fi" id="h-dia">
-          <option>Lunes</option><option>Martes</option><option>Miércoles</option>
-          <option>Jueves</option><option>Viernes</option><option>Sábado</option><option>Domingo</option>
-        </select>
-      </div>
-      <div class="fg"><label class="fl">Hora</label><input class="fi" id="h-hora" placeholder="08:00" type="time"/></div>
-    </div>
-    <div class="fg"><label class="fl">Horario asignado</label>
-      <select class="fi" id="f-horario">
-        <option value="">Sin asignar</option>
-        <option>Lunes 07:00</option><option>Lunes 08:00</option><option>Lunes 09:00</option><option>Lunes 18:00</option><option>Lunes 19:00</option>
-        <option>Martes 14:00</option><option>Martes 15:00</option><option>Martes 16:00</option>
-        <option>Miércoles 07:00</option><option>Miércoles 08:00</option><option>Miércoles 09:00</option><option>Miércoles 18:00</option><option>Miércoles 19:00</option>
-        <option>Jueves 14:00</option><option>Jueves 15:00</option><option>Jueves 16:00</option>
-        <option>Viernes 07:00</option><option>Viernes 08:00</option><option>Viernes 09:00</option><option>Viernes 18:00</option><option>Viernes 19:00</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="document.getElementById('modal-horario').style.display='none'">Cancelar</button>
-      <button class="btn btn-fire" onclick="guardarHorario()">Guardar horario</button>
     </div>
   </div>
 </div>
@@ -559,7 +531,11 @@ const HORARIOS_FIJOS = [
 function cuposLibres(key){
   const hf = HORARIOS_FIJOS.find(h=>h.key===key);
   if(!hf) return 0;
-  const ocupados = alumnos.filter(a => a.activo && (a.horario===key || (a.horario2 && a.horario2===key))).length;
+  const ocupados = alumnos.filter(a => {
+    if(!a.activo) return false;
+    if(a.horarios && a.horarios.length) return a.horarios.includes(key);
+    return a.horario===key; // retrocompat
+  }).length;
   return hf.cupos - ocupados;
 }
 
@@ -780,7 +756,10 @@ function renderProspectos(){
       <td><div class="av-row"><div class="avatar" style="background:var(--cyan)">${p.nombre[0]}</div>
         <div><div class="td-name">${p.nombre}</div><div class="td-sub">${p.email||""}</div></div></div></td>
       <td style="color:#555">${p.telefono||""}</td>
-      <td><span class="badge b-horario">${p.horario||"Sin preferencia"}</span></td>
+      <td>
+        <span class="badge b-horario">${(p.horarios&&p.horarios.length)?p.horarios.length+' horario'+(p.horarios.length!==1?'s':''):(p.horario||"Sin preferencia")}</span>
+        ${p.plan?`<div style="font-size:10px;color:#444;margin-top:3px;">${p.plan}</div>`:""}
+      </td>
       <td><span class="badge b-prospect">● NUEVO</span></td>
       <td style="font-size:11px;color:#444">${p.fecha||""}</td>
       <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -793,7 +772,7 @@ function renderProspectos(){
       <td><div class="av-row"><div class="avatar" style="background:#333">${p.nombre[0]}</div>
         <div><div class="td-name">${p.nombre}</div><div class="td-sub">${p.email||""}</div></div></div></td>
       <td style="color:#555">${p.telefono||""}</td>
-      <td style="color:#555">${p.horario||"—"}</td>
+      <td style="color:#555">${(p.horarios&&p.horarios.length)?p.horarios.length+' horarios':(p.horario||"—")}</td>
       <td><span class="badge ${p.estado==="confirmado"?"b-paid":"b-inact"}">${p.estado==="confirmado"?"✓ Confirmado":"Archivado"}</span></td>
       <td style="font-size:11px;color:#444">${p.fecha||""}</td>
       <td><button class="btn btn-danger btn-sm" onclick="abrirDelete('${p.id}','${p.nombre}','prospecto')">✕</button></td>
@@ -931,15 +910,60 @@ window.copiarLinkInscripcion=function(){
 }
 
 function mostrarFormularioInscripcion(){
-  const horariosOpts=horarios.length
-    ?horarios.sort((a,b)=>DIAS_ORDEN.indexOf(a.dia)-DIAS_ORDEN.indexOf(b.dia))
-      .map(h=>`<option value="${h.dia} ${h.hora} — ${h.clase}">${h.dia} ${h.hora} — ${h.clase}</option>`).join("")
-    :`<option>Sin horarios disponibles</option>`;
+  const DIAS_FORM = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
+
+  function opcionesHorarioPlan(seleccionados, idxActual){
+    return DIAS_FORM.flatMap(dia =>
+      HORARIOS_FIJOS.filter(h => h.dia === dia).map(h => {
+        const libres = cuposLibres(h.key);
+        const yaElegidoEnOtro = seleccionados.some((v,i)=>i!==idxActual && v===h.key);
+        const disabled = (libres <= 0 || yaElegidoEnOtro) ? "disabled" : "";
+        const label = libres <= 0
+          ? `${dia} ${h.hora} — Sin cupos`
+          : yaElegidoEnOtro
+          ? `${dia} ${h.hora} — Ya elegido`
+          : `${dia} ${h.hora} — ${libres} cupo${libres !== 1 ? "s" : ""} disponible${libres !== 1 ? "s" : ""}`;
+        const sel = seleccionados[idxActual]===h.key ? "selected" : "";
+        return `<option value="${h.key}" ${disabled} ${sel}>${label}</option>`;
+      })
+    ).join("");
+  }
+
+  window._insHorarios = ["",""];
+  window._insPlan = "2 veces/semana — $50.000";
+
+  window.renderHorariosFormulario = function(){
+    const cant = window._insPlan.includes("3 veces") ? 3 : 2;
+    while(window._insHorarios.length < cant) window._insHorarios.push("");
+    window._insHorarios = window._insHorarios.slice(0,cant);
+    const wrap = document.getElementById("ins-horarios-wrap");
+    if(!wrap) return;
+    let html = "";
+    for(let i=0;i<cant;i++){
+      html += `<div class="fg">
+        <label class="fl">Día y horario ${i+1} ${cant>1?`(${i+1}/${cant})`:""} *</label>
+        <select class="fi" id="ins-horario-${i}" onchange="window._insHorarios[${i}]=this.value; renderHorariosFormulario();">
+          <option value="">— Elegí un horario —</option>
+          ${opcionesHorarioPlan(window._insHorarios, i)}
+        </select>
+      </div>`;
+    }
+    wrap.innerHTML = html;
+  };
+
+  window.seleccionarPlanForm = function(val, el){
+    document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('selected');
+    el.querySelector('input').checked = true;
+    window._insPlan = val;
+    renderHorariosFormulario();
+  };
+
   document.body.innerHTML=`
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
     body{background:#0a0a0a;color:#f0f0f0;font-family:'Outfit',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
-    .form-wrap{width:100%;max-width:480px;}
+    .form-wrap{width:100%;max-width:500px;}
     .form-hero{background:#0f1a10;border:1px solid rgba(57,211,83,0.2);border-radius:18px 18px 0 0;padding:32px;text-align:center;}
     .form-hero-logo{width:90px;height:90px;border-radius:50%;margin:0 auto 14px;border:2px solid rgba(57,211,83,0.3);}
     .form-hero-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;color:#fff;}
@@ -949,8 +973,20 @@ function mostrarFormularioInscripcion(){
     .fl{display:block;font-size:11px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;}
     .fi{width:100%;background:#0f0f0f;border:1px solid #222;color:#f0f0f0;padding:12px 14px;border-radius:10px;font-size:14px;font-family:'Outfit',sans-serif;outline:none;}
     .fi:focus{border-color:#39d353;}
+    .fi:disabled{opacity:0.4;cursor:not-allowed;}
+    option:disabled{color:#333;}
+    .plan-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
+    .plan-card{background:#0f0f0f;border:2px solid #1e1e1e;border-radius:12px;padding:16px;cursor:pointer;transition:all 0.15s;text-align:center;}
+    .plan-card:hover{border-color:#39d353;}
+    .plan-card.selected{border-color:#39d353;background:rgba(57,211,83,0.06);}
+    .plan-card input{display:none;}
+    .plan-freq{font-size:12px;color:#555;margin-bottom:4px;}
+    .plan-precio{font-family:'Bebas Neue',sans-serif;font-size:26px;color:#39d353;letter-spacing:0.5px;}
+    .plan-detalle{font-size:11px;color:#444;margin-top:3px;}
     .btn-submit{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;background:linear-gradient(135deg,#39d353,#00c4cc);color:#0a0a0a;margin-top:8px;}
     .form-footer{text-align:center;font-size:11px;color:#2a2a2a;margin-top:16px;}
+    .aviso-cupos{background:rgba(57,211,83,0.04);border:1px solid rgba(57,211,83,0.12);border-radius:10px;padding:12px 14px;font-size:12px;color:#4a6a4a;margin-bottom:16px;line-height:1.5;}
+    .step-num{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#39d353;color:#0a0a0a;font-size:10px;font-weight:800;margin-right:6px;}
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"/>
   <div class="form-wrap">
@@ -960,38 +996,60 @@ function mostrarFormularioInscripcion(){
       <div class="form-hero-sub">Completá tus datos para inscribirte</div>
     </div>
     <div class="form-body">
-      <div class="fg"><label class="fl">Nombre completo *</label><input class="fi" id="ins-nombre" placeholder="Juan Pérez"/></div>
-      <div class="fg"><label class="fl">Teléfono *</label><input class="fi" id="ins-tel" placeholder="1123456789" type="tel"/></div>
-      <div class="fg"><label class="fl">Email</label><input class="fi" id="ins-email" placeholder="juan@email.com" type="email"/></div>
-      <div class="fg"><label class="fl">Horario de preferencia</label>
-        <select class="fi" id="ins-horario"><option value="">Sin preferencia</option>${horariosOpts}</select>
+      <div class="fg"><label class="fl"><span class="step-num">1</span>Nombre completo *</label><input class="fi" id="ins-nombre" placeholder="Juan Pérez"/></div>
+      <div class="fg"><label class="fl"><span class="step-num">2</span>Teléfono *</label><input class="fi" id="ins-tel" placeholder="1123456789" type="tel"/></div>
+      <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="ins-email" placeholder="juan@email.com" type="email"/></div>
+      <div class="fg">
+        <label class="fl"><span class="step-num">3</span>Elegí tu plan</label>
+        <div class="plan-cards">
+          <label class="plan-card selected" onclick="seleccionarPlanForm('2 veces/semana — $50.000',this)">
+            <input type="radio" name="ins-plan" value="2 veces/semana — $50.000" checked/>
+            <div class="plan-freq">2 veces por semana</div>
+            <div class="plan-precio">$50.000</div>
+            <div class="plan-detalle">Membresía mensual</div>
+          </label>
+          <label class="plan-card" onclick="seleccionarPlanForm('3 veces/semana — $60.000',this)">
+            <input type="radio" name="ins-plan" value="3 veces/semana — $60.000"/>
+            <div class="plan-freq">3 veces por semana</div>
+            <div class="plan-precio">$60.000</div>
+            <div class="plan-detalle">Membresía mensual</div>
+          </label>
+        </div>
       </div>
-      <div class="fg"><label class="fl">¿Qué te interesa?</label>
-        <select class="fi" id="ins-plan">
-          <option>Entrenamiento Personalizado</option>
-          <option>Fuerza</option>
-          <option>Combo (EP + Fuerza)</option>
-          <option>Quiero info primero</option>
-        </select>
+      <div class="aviso-cupos">
+        💪 Solo hacemos <strong>Entrenamiento Personalizado</strong>. Elegí <span class="step-num">4</span> los días y horarios — los cupos se actualizan en tiempo real.
       </div>
+      <div id="ins-horarios-wrap"></div>
       <div class="fg"><label class="fl">Mensaje (opcional)</label>
         <textarea class="fi" id="ins-mensaje" rows="3" placeholder="Contanos algo sobre vos o consultanos lo que quieras..."></textarea>
       </div>
-      <button class="btn-submit" onclick="enviarInscripcion()">Enviar inscripción 🚀</button>
+      <button class="btn-submit" onclick="enviarInscripcion()">Confirmar inscripción 🚀</button>
       <div class="form-footer">Tribu | Espacio Fitness · ${gymConfig.direccion||'Av. 9 de Julio 351'}</div>
     </div>
   </div>`;
+
+  renderHorariosFormulario();
 }
 
 window.enviarInscripcion=async function(){
   const nombre=document.getElementById("ins-nombre").value.trim();
   const tel=document.getElementById("ins-tel").value.trim();
   if(!nombre||!tel){ alert("Completá nombre y teléfono para continuar."); return; }
+  const plan=window._insPlan||"2 veces/semana — $50.000";
+  const cantReq = plan.includes("3 veces") ? 3 : 2;
+  const horariosElegidos = (window._insHorarios||[]).filter(h=>h);
+  if(horariosElegidos.length < cantReq){
+    alert(`Por favor elegí los ${cantReq} días y horarios de tu plan.`);
+    return;
+  }
+  const monto=plan.includes("3 veces")?60000:50000;
   const data={
     nombre, telefono:tel,
     email:document.getElementById("ins-email").value.trim(),
-    horario:document.getElementById("ins-horario").value,
-    plan:document.getElementById("ins-plan").value,
+    horario:horariosElegidos[0],
+    horarios:horariosElegidos,
+    plan,
+    monto,
     mensaje:document.getElementById("ins-mensaje").value.trim(),
     estado:"nuevo",
     fecha:new Date().toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"})
@@ -1011,16 +1069,30 @@ window.enviarInscripcion=async function(){
   </div>`;
 }
 
+
 window.verProspecto=function(id){
   const p=prospectos.find(x=>x.id===id);
   if(!p) return;
+  const horariosArr = (p.horarios&&p.horarios.length) ? p.horarios : (p.horario?[p.horario]:[]);
+  const horariosHtml = horariosArr.length ? horariosArr.map(h=>{
+    const libres = cuposLibres(h);
+    const color = libres>0 ? "var(--accent)" : "#ff5050";
+    const estado = libres>0 ? `${libres} cupo${libres!==1?"s":""} libre${libres!==1?"s":""}` : "sin cupo";
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1a1a1a;">
+      <span style="font-size:13px;">${h}</span>
+      <span style="font-size:11px;color:${color};font-weight:700;">${estado}</span>
+    </div>`;
+  }).join("") : `<div style="font-size:12px;color:#444;">Sin horario elegido</div>`;
   document.getElementById("prospecto-detalle").innerHTML=`
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div style="display:flex;justify-content:space-between;"><span style="color:#444;">👤 Nombre</span><strong>${p.nombre}</strong></div>
       <div style="display:flex;justify-content:space-between;"><span style="color:#444;">📞 Teléfono</span><span>${p.telefono||"—"}</span></div>
       <div style="display:flex;justify-content:space-between;"><span style="color:#444;">📧 Email</span><span>${p.email||"—"}</span></div>
-      <div style="display:flex;justify-content:space-between;"><span style="color:#444;">🗓 Horario preferido</span><span>${p.horario||"Sin preferencia"}</span></div>
       <div style="display:flex;justify-content:space-between;"><span style="color:#444;">📋 Plan interesado</span><span>${p.plan||"—"}</span></div>
+      <div style="background:#111;border-radius:10px;padding:14px;">
+        <div style="font-size:11px;color:#444;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🗓 Horarios elegidos</div>
+        ${horariosHtml}
+      </div>
       ${p.mensaje?`<div style="background:#111;border-radius:10px;padding:14px;"><div style="font-size:11px;color:#444;margin-bottom:6px;">💬 Mensaje</div><div style="font-size:13px;line-height:1.6;">${p.mensaje}</div></div>`:""}
       <div style="display:flex;justify-content:space-between;"><span style="color:#444;">📆 Fecha</span><span style="font-size:12px;color:#444;">${p.fecha||""}</span></div>
     </div>`;
@@ -1047,15 +1119,24 @@ Recibimos tu inscripción en *Tribu | Espacio Fitness*. Nos ponemos en contacto 
 window.convertirProspecto=async function(id){
   const p=prospectos.find(x=>x.id===id);
   if(!p) return;
+  const horariosArr = (p.horarios&&p.horarios.length) ? p.horarios : (p.horario?[p.horario]:[]);
+  // Verificar que los cupos sigan disponibles antes de confirmar
+  const sinCupo = horariosArr.filter(h=>cuposLibres(h) <= 0);
+  if(sinCupo.length){
+    toast(`⚠️ Algunos horarios ya no tienen cupo: ${sinCupo.join(", ")}. Editá el socio luego de confirmar.`,"err");
+  }
   await addDoc(alumnosCol,{
     nombre:p.nombre, email:p.email||"", telefono:p.telefono||"",
-    plan:p.plan==="Quiero info primero"?"Mensual":(p.plan||"Entrenamiento Personalizado"),
-    monto:0, activo:true,
+    plan:p.plan||"2 veces/semana — $50.000",
+    monto:p.monto||(p.plan&&p.plan.includes("3 veces")?60000:50000),
+    horario:horariosArr[0]||"",
+    horarios:horariosArr,
+    activo:true,
     fechaAlta:new Date().toISOString().slice(0,10), cuotas:{}
   });
   await updateDoc(doc(db,"prospectos",id),{estado:"confirmado"});
   document.getElementById("modal-prospecto").style.display="none";
-  toast("✓ Socio agregado — revisá y completá el monto","ok");
+  if(!sinCupo.length) toast("✓ Socio agregado con sus horarios confirmados","ok");
   navTo("alumnos");
 }
 
@@ -1268,8 +1349,10 @@ window.abrirNuevo=function(){
   document.getElementById("modal-titulo").textContent="Nuevo socio";
   document.getElementById("edit-id").value="";
   ["f-nombre","f-email","f-tel","f-monto"].forEach(id=>document.getElementById(id).value="");
-  document.getElementById("f-plan").value="Entrenamiento Personalizado";
+  document.getElementById("f-plan").value="2 veces/semana — $50.000";
+  document.getElementById("f-monto").value="50000";
   activoForm=true; actualizarToggle();
+  renderHorariosSocio("2 veces/semana — $50.000",[]);
   document.getElementById("modal-alumno").style.display="flex";
 }
 
@@ -1282,8 +1365,11 @@ window.abrirEditar=function(id){
   document.getElementById("f-tel").value=a.telefono||"";
   document.getElementById("f-plan").value=a.plan||"2 veces/semana — $50.000";
   document.getElementById("f-monto").value=a.monto||"";
-  const fh=document.getElementById("f-horario"); if(fh) fh.value=a.horario||"";
   activoForm=!!a.activo; actualizarToggle();
+  const horarios_vals = a.horarios||[];
+  // retrocompat: si tiene horario viejo (string), lo convertimos
+  const vals = horarios_vals.length ? horarios_vals : (a.horario ? [a.horario] : []);
+  renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals);
   document.getElementById("modal-alumno").style.display="flex";
 }
 
@@ -1301,14 +1387,65 @@ window.actualizarMontoSegunPlan=function(){
   const montoEl=document.getElementById("f-monto");
   if(plan.includes("2 veces")) montoEl.value="50000";
   else if(plan.includes("3 veces")) montoEl.value="60000";
+  renderHorariosSocio(plan);
+}
+
+function renderHorariosSocio(plan, vals=[]){
+  const esTres = plan && plan.includes("3 veces");
+  const cantidad = esTres ? 3 : 2;
+  const DIAS_F = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
+  function optsHorario(selVal, excludeKeys=[]){
+    return DIAS_F.flatMap(dia =>
+      HORARIOS_FIJOS.filter(h=>h.dia===dia).map(h=>{
+        const libres = cuposLibres(h.key);
+        const esExcluido = excludeKeys.includes(h.key);
+        const dis = (libres<=0 && h.key!==selVal && !esExcluido) ? "disabled" : "";
+        const label = libres<=0 ? `${h.key} — Sin cupos` : `${h.key} — ${libres} cupo${libres!==1?"s":""}`;
+        const sel = h.key===selVal ? "selected" : "";
+        return `<option value="${h.key}" ${dis} ${sel}>${label}</option>`;
+      })
+    ).join("");
+  }
+  let html = "";
+  for(let i=0;i<cantidad;i++){
+    const label = cantidad===2 ? (i===0?"Día 1":"Día 2") : (i===0?"Día 1":i===1?"Día 2":"Día 3");
+    const id = `f-horario-${i}`;
+    html += `<div class="fg"><label class="fl">Horario — ${label}</label>
+      <select class="fi" id="${id}" onchange="renderHorariosSocio(document.getElementById('f-plan').value, getHorariosSeleccionados())">
+        <option value="">— Elegí un horario —</option>
+        ${optsHorario(vals[i]||"", vals.filter((_,j)=>j!==i))}
+      </select>
+    </div>`;
+  }
+  const wrap = document.getElementById("horarios-socio-wrap");
+  if(wrap) wrap.innerHTML = html;
+}
+
+window.getHorariosSeleccionados=function(){
+  const res=[];
+  for(let i=0;i<3;i++){
+    const el=document.getElementById(`f-horario-${i}`);
+    if(el) res.push(el.value);
+  }
+  return res;
 }
 
 window.guardarAlumno=async function(){
   const nombre=document.getElementById("f-nombre").value.trim();
   const monto=document.getElementById("f-monto").value;
   if(!nombre||!monto) return toast("Completá nombre y monto","err");
-  const horario=document.getElementById("f-horario")?.value||"";
-  const data={nombre,monto:Number(monto),activo:activoForm,email:document.getElementById("f-email").value.trim(),telefono:document.getElementById("f-tel").value.trim(),plan:document.getElementById("f-plan").value,horario};
+  const horarios_sel=getHorariosSeleccionados().filter(h=>h);
+  const plan=document.getElementById("f-plan").value;
+  const cantReq=plan.includes("3 veces")?3:2;
+  if(horarios_sel.length<cantReq) return toast(`Asigná los ${cantReq} horarios del plan`,"err");
+  const data={
+    nombre, monto:Number(monto), activo:activoForm,
+    email:document.getElementById("f-email").value.trim(),
+    telefono:document.getElementById("f-tel").value.trim(),
+    plan,
+    horario:horarios_sel[0]||"",
+    horarios:horarios_sel
+  };
   const editId=document.getElementById("edit-id").value;
   if(editId){ await updateDoc(doc(db,"alumnos",editId),data); toast("Socio actualizado ✓"); }
   else{ data.fechaAlta=new Date().toISOString().slice(0,10); data.cuotas={}; await addDoc(alumnosCol,data); toast("Socio agregado ✓"); }
