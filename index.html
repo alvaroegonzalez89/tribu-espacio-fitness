@@ -273,12 +273,9 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">Plan</label>
-        <select class="fi" id="f-plan">
-          <option>Entrenamiento Personalizado</option>
-          <option>Fuerza</option>
-          <option>Combo (EP + Fuerza)</option>
-          <option>Mensual</option>
-          <option>Trimestral</option>
+        <select class="fi" id="f-plan" onchange="actualizarMontoSegunPlan()">
+          <option value="2 veces/semana — $50.000">2 veces/semana — $50.000</option>
+          <option value="3 veces/semana — $60.000">3 veces/semana — $60.000</option>
         </select>
       </div>
       <div class="fg"><label class="fl">Monto ($)</label><input class="fi" type="number" id="f-monto" placeholder="0"/></div>
@@ -304,7 +301,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
 
 <div class="modal-bg" id="modal-horario" style="display:none;">
   <div class="modal-box">
-    <div class="modal-title" id="modal-horario-titulo">Nuevo horario</div>
+    <div class="modal-title" id="modal-horario-titulo">Asignar horario al socio</div>
     <input type="hidden" id="h-id"/>
     <div class="frow">
       <div class="fg"><label class="fl">Día</label>
@@ -315,16 +312,15 @@ tr:hover td{background:rgba(255,255,255,0.01);}
       </div>
       <div class="fg"><label class="fl">Hora</label><input class="fi" id="h-hora" placeholder="08:00" type="time"/></div>
     </div>
-    <div class="fg"><label class="fl">Tipo de clase</label>
-      <select class="fi" id="h-clase">
-        <option>Entrenamiento Personalizado</option>
-        <option>Fuerza</option>
-        <option>Combo (EP + Fuerza)</option>
+    <div class="fg"><label class="fl">Horario asignado</label>
+      <select class="fi" id="f-horario">
+        <option value="">Sin asignar</option>
+        <option>Lunes 07:00</option><option>Lunes 08:00</option><option>Lunes 09:00</option><option>Lunes 18:00</option><option>Lunes 19:00</option>
+        <option>Martes 14:00</option><option>Martes 15:00</option><option>Martes 16:00</option>
+        <option>Miércoles 07:00</option><option>Miércoles 08:00</option><option>Miércoles 09:00</option><option>Miércoles 18:00</option><option>Miércoles 19:00</option>
+        <option>Jueves 14:00</option><option>Jueves 15:00</option><option>Jueves 16:00</option>
+        <option>Viernes 07:00</option><option>Viernes 08:00</option><option>Viernes 09:00</option><option>Viernes 18:00</option><option>Viernes 19:00</option>
       </select>
-    </div>
-    <div class="frow">
-      <div class="fg"><label class="fl">Cupos máximos</label><input class="fi" type="number" id="h-cupos" placeholder="10"/></div>
-      <div class="fg"><label class="fl">Instructor</label><input class="fi" id="h-instructor" placeholder="Nombre del profe"/></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="document.getElementById('modal-horario').style.display='none'">Cancelar</button>
@@ -541,7 +537,31 @@ let alumnos=[], horarios=[], prospectos=[];
 let vistaActual="hero", mesVista=new Date().getMonth(), añoVista=new Date().getFullYear();
 let busqueda="", activoForm=true, pendingDeleteId=null, pendingDeleteType="alumno";
 let _comprobante=null, _transferSocio=null, _pendientesLista=[], _recIdx=0;
-let gymConfig={nombre:"Tribu | Espacio Fitness",telefono:"2604231994",direccion:"Av. 9 de Julio 351",banco:"",cbu:"",alias:"",titular:""};
+let gymConfig={nombre:"Tribu | Espacio Fitness",telefono:"2604231994",direccion:"Av. 9 de Julio 351",banco:"",cbu:"",alias:"",titular:"",mp_link:""};
+
+// ── HORARIOS FIJOS DE TRIBU ──
+const HORARIOS_FIJOS = [
+  // Lunes, Miércoles, Viernes — cupo 4
+  ...["Lunes","Miércoles","Viernes"].flatMap(dia =>
+    ["07:00","08:00","09:00","18:00","19:00"].map(hora => ({key:`${dia} ${hora}`, dia, hora, cupos:4}))
+  ),
+  // Martes, Jueves — cupo 5 solo 14:00, resto 4
+  ...["Martes","Jueves"].flatMap(dia =>
+    [
+      {hora:"14:00", cupos:5},
+      {hora:"15:00", cupos:4},
+      {hora:"16:00", cupos:4}
+    ].map(({hora,cupos}) => ({key:`${dia} ${hora}`, dia, hora, cupos}))
+  )
+];
+
+// Calcula cupos libres de un horario clave (ej "Lunes 07:00")
+function cuposLibres(key){
+  const hf = HORARIOS_FIJOS.find(h=>h.key===key);
+  if(!hf) return 0;
+  const ocupados = alumnos.filter(a => a.activo && (a.horario===key || (a.horario2 && a.horario2===key))).length;
+  return hf.cupos - ocupados;
+}
 
 function clavesMes(){ return `${añoVista}-${mesVista}`; }
 const COLORS=["#39d353","#00c4cc","#FFD23F","#9B5DE5","#3b82f6","#F15BB5","#00BBF9","#ff8c00"];
@@ -805,53 +825,95 @@ function renderProspectos(){
 }
 
 function renderHorarios(){
-  const ordenados=[...horarios].sort((a,b)=>{
-    const da=DIAS_ORDEN.indexOf(a.dia), db=DIAS_ORDEN.indexOf(b.dia);
-    return da!==db?da-db:a.hora.localeCompare(b.hora);
-  });
-  const cards=ordenados.length?ordenados.map(h=>{
-    const cupos=Number(h.cupos||0);
-    const inscriptos=prospectos.filter(p=>p.horario===`${h.dia} ${h.hora} — ${h.clase}`).length;
-    const libres=cupos-inscriptos;
-    const claseCard=libres<=0?"lleno":libres<=3?"":"disponible";
-    const colorCupos=libres<=0?"cupos-lleno":libres<=3?"cupos-bajo":"cupos-ok";
-    return `<div class="horario-card ${claseCard}">
-      <button class="horario-del" onclick="eliminarHorario('${h.id}')">✕</button>
-      <div class="horario-dia">${h.dia}</div>
-      <div class="horario-hora">${h.hora}</div>
-      <div class="horario-clase">${h.clase||""}</div>
-      ${h.instructor?`<div style="font-size:11px;color:#333;margin-top:4px;">👤 ${h.instructor}</div>`:""}
-      <div class="horario-cupos ${colorCupos}">${libres<=0?"❌ Sin cupos":`${libres} cupo${libres!==1?"s":""} libre${libres!==1?"s":""}`}</div>
+  const grupos = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
+  const sections = grupos.map(dia => {
+    const slots = HORARIOS_FIJOS.filter(h=>h.dia===dia);
+    const cards = slots.map(h => {
+      const libres = cuposLibres(h.key);
+      const ocupados = h.cupos - libres;
+      const pct = Math.round((ocupados/h.cupos)*100);
+      const colorBar = libres===0?"#ff5050":libres===1?"#ff8c00":libres<=2?"#ffd23f":"#39d353";
+      const colorText = libres===0?"cupos-lleno":libres===1?"cupos-bajo":"cupos-ok";
+      // Lista de socios en este horario
+      const enEsteHorario = alumnos.filter(a=>a.activo&&(a.horario===h.key||(a.horario2&&a.horario2===h.key)));
+      const sociosList = enEsteHorario.length ? enEsteHorario.map(a=>`
+        <div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid #1a1a1a;">
+          <div style="width:22px;height:22px;border-radius:50%;background:${avatarColor(a.nombre)};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${a.nombre[0]}</div>
+          <span style="font-size:11px;color:#aaa;">${a.nombre}</span>
+        </div>`).join("") : "";
+      return `<div class="horario-card ${libres===0?"lleno":"disponible"}" style="cursor:default;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+          <div>
+            <div class="horario-hora">${h.hora}</div>
+            <div style="font-size:10px;color:#444;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Entrenamiento Personalizado</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${colorBar};">${ocupados}/${h.cupos}</div>
+            <div style="font-size:9px;color:#333;">socios</div>
+          </div>
+        </div>
+        <div style="height:4px;background:#1a1a1a;border-radius:2px;margin-bottom:10px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${colorBar};border-radius:2px;transition:width 0.3s;"></div>
+        </div>
+        ${sociosList}
+        <div class="horario-cupos ${colorText}" style="margin-top:8px;">${libres===0?"❌ Sin cupos disponibles":`✓ ${libres} cupo${libres!==1?"s":""} libre${libres!==1?"s":""}`}</div>
+      </div>`;
+    }).join("");
+    return `<div style="margin-bottom:22px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--accent);letter-spacing:1px;padding:0 4px;margin-bottom:10px;border-left:3px solid var(--accent);padding-left:10px;">${dia}</div>
+      <div class="horarios-grid" style="grid-template-columns:repeat(auto-fill,minmax(190px,1fr));">${cards}</div>
     </div>`;
-  }).join(""):`<div class="empty">No hay horarios cargados. Agregá el primero.</div>`;
+  }).join("");
+
+  const totalCupos = HORARIOS_FIJOS.reduce((s,h)=>s+h.cupos,0);
+  const totalOcupados = HORARIOS_FIJOS.reduce((s,h)=>s+(h.cupos-cuposLibres(h.key)),0);
+
   return `<div class="page">
     <div class="topbar">
-      <div><div class="eyebrow">Clases y disponibilidad</div><div class="page-title">Horarios</div></div>
-      <button class="btn btn-fire" onclick="abrirNuevoHorario()">+ Nuevo horario</button>
+      <div><div class="eyebrow">Entrenamiento Personalizado</div><div class="page-title">Horarios y cupos</div></div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:13px;color:#666;">
+        Total: <strong style="color:var(--accent);">${totalOcupados}</strong> / ${totalCupos} cupos ocupados
+      </div>
     </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">Clases disponibles</div><div style="font-size:12px;color:#333;">Los prospectos ven estos horarios al inscribirse</div></div>
-      <div class="horarios-grid">${cards}</div>
+    <div style="background:rgba(57,211,83,0.04);border:1px solid rgba(57,211,83,0.12);border-radius:12px;padding:14px 18px;margin-bottom:22px;font-size:12px;color:#555;line-height:1.6;">
+      💡 Los cupos se actualizan automáticamente al dar de alta o baja socios. Cada socio ocupa su horario principal y secundario (si tiene plan de 3 veces/semana).
     </div>
+    ${sections}
   </div>`;
 }
 
 function renderConfig(){
   return `<div class="page">
     <div class="topbar"><div><div class="eyebrow">Ajustes</div><div class="page-title">Configuración</div></div></div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">🏦 Datos del gimnasio y transferencia</div></div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><div class="card-title">🏦 Datos del gimnasio y cobro</div></div>
       <div style="padding:24px;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="fg" style="grid-column:1/-1"><label class="fl">Nombre del gimnasio</label><input class="fi" id="cfg-nombre" value="${gymConfig.nombre}"/></div>
           <div class="fg"><label class="fl">Teléfono</label><input class="fi" id="cfg-telefono" value="${gymConfig.telefono||''}"/></div>
           <div class="fg"><label class="fl">Dirección</label><input class="fi" id="cfg-direccion" value="${gymConfig.direccion||''}"/></div>
-          <div class="fg"><label class="fl">Banco</label><input class="fi" id="cfg-banco" value="${gymConfig.banco}"/></div>
-          <div class="fg"><label class="fl">CBU</label><input class="fi" id="cfg-cbu" value="${gymConfig.cbu}"/></div>
-          <div class="fg"><label class="fl">Alias</label><input class="fi" id="cfg-alias" value="${gymConfig.alias}"/></div>
-          <div class="fg"><label class="fl">Titular</label><input class="fi" id="cfg-titular" value="${gymConfig.titular}"/></div>
+          <div class="fg"><label class="fl">Banco</label><input class="fi" id="cfg-banco" value="${gymConfig.banco||''}"/></div>
+          <div class="fg"><label class="fl">CBU</label><input class="fi" id="cfg-cbu" value="${gymConfig.cbu||''}"/></div>
+          <div class="fg"><label class="fl">Alias</label><input class="fi" id="cfg-alias" value="${gymConfig.alias||''}"/></div>
+          <div class="fg"><label class="fl">Titular</label><input class="fi" id="cfg-titular" value="${gymConfig.titular||''}"/></div>
         </div>
         <button class="btn btn-fire" onclick="guardarConfig()" style="margin-top:8px;">💾 Guardar</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">💳 MercadoPago</div></div>
+      <div style="padding:24px;">
+        <div style="background:rgba(0,196,204,0.05);border:1px solid rgba(0,196,204,0.15);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:#555;line-height:1.6;">
+          💡 Creá un link de pago en <strong style="color:var(--cyan);">mercadopago.com.ar/cobros</strong> con el monto de la membresía y pegalo acá. Aparecerá en el comprobante y en los recordatorios para que los socios paguen directo desde WhatsApp.
+        </div>
+        <div class="fg"><label class="fl">Link de pago MercadoPago</label>
+          <input class="fi" id="cfg-mp-link" value="${gymConfig.mp_link||''}" placeholder="https://mpago.la/..."/>
+        </div>
+        <button class="btn btn-fire" onclick="guardarConfigMP()" style="margin-top:4px;">💾 Guardar link MP</button>
+        ${gymConfig.mp_link?`<div style="margin-top:12px;padding:10px 14px;background:#0a1a0b;border:1px solid #1a3a1a;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <span style="font-size:11px;color:#3a8a4a;font-family:monospace;word-break:break-all;">${gymConfig.mp_link}</span>
+          <a href="${gymConfig.mp_link}" target="_blank" class="btn btn-success btn-sm">Probar →</a>
+        </div>`:""}
       </div>
     </div>
   </div>`;
@@ -1069,6 +1131,7 @@ window.enviarComprobante=function(){
   const c=_comprobante; if(!c) return;
   const tel=(c.a.telefono||"").replace(/\D/g,"");
   const telFull=tel.startsWith("54")?tel:`54${tel}`;
+  const mpLinea=gymConfig.mp_link?`\n💳 Pagá online: ${gymConfig.mp_link}`:"";
   const msg=encodeURIComponent(`✅ *COMPROBANTE DE PAGO*
 ━━━━━━━━━━━━━━━━━━
 💪 *${gymConfig.nombre}*
@@ -1080,7 +1143,7 @@ N° Comprobante: #${c.nroComp}
 💰 Monto abonado: $${c.monto}
 ━━━━━━━━━━━━━━━━━━
 📆 Fecha: ${c.fecha}
-🕐 Hora: ${c.hora}
+🕐 Hora: ${c.hora}${mpLinea}
 ━━━━━━━━━━━━━━━━━━
 ¡Gracias por tu pago! 💪`);
   window.open(`https://wa.me/${telFull}?text=${msg}`,"_blank");
@@ -1157,13 +1220,14 @@ window.enviarRecordatorioActual=function(){
   const tel=(a.telefono||"").replace(/\D/g,"");
   const telFull=tel.startsWith("54")?tel:`54${tel}`;
   const monto=Number(a.monto||0).toLocaleString("es-AR");
+  const mpRecordatorio=gymConfig.mp_link?`\n💳 Pagá online ahora: ${gymConfig.mp_link}`:"";
   const msg=encodeURIComponent(`Hola ${a.nombre.split(" ")[0]} 👋
 
 Te recordamos que tu cuota de *${MESES[mesVista]} ${añoVista}* en *${gymConfig.nombre}* está pendiente.
 
 💰 Monto: $${monto}
 📋 Plan: ${a.plan||"Mensual"}${gymConfig.alias?`
-🔑 Alias: *${gymConfig.alias}*`:""}
+🔑 Alias: *${gymConfig.alias}*`:""}${mpRecordatorio}
 
 ¡Gracias! 🏋️💪`);
   window.open(`https://wa.me/${telFull}?text=${msg}`,"_blank");
@@ -1216,8 +1280,9 @@ window.abrirEditar=function(id){
   document.getElementById("f-nombre").value=a.nombre||"";
   document.getElementById("f-email").value=a.email||"";
   document.getElementById("f-tel").value=a.telefono||"";
-  document.getElementById("f-plan").value=a.plan||"Entrenamiento Personalizado";
+  document.getElementById("f-plan").value=a.plan||"2 veces/semana — $50.000";
   document.getElementById("f-monto").value=a.monto||"";
+  const fh=document.getElementById("f-horario"); if(fh) fh.value=a.horario||"";
   activoForm=!!a.activo; actualizarToggle();
   document.getElementById("modal-alumno").style.display="flex";
 }
@@ -1231,11 +1296,19 @@ function actualizarToggle(){
   document.getElementById("tog-label").style.color=activoForm?"var(--accent)":"#444";
 }
 
+window.actualizarMontoSegunPlan=function(){
+  const plan=document.getElementById("f-plan").value;
+  const montoEl=document.getElementById("f-monto");
+  if(plan.includes("2 veces")) montoEl.value="50000";
+  else if(plan.includes("3 veces")) montoEl.value="60000";
+}
+
 window.guardarAlumno=async function(){
   const nombre=document.getElementById("f-nombre").value.trim();
   const monto=document.getElementById("f-monto").value;
   if(!nombre||!monto) return toast("Completá nombre y monto","err");
-  const data={nombre,monto:Number(monto),activo:activoForm,email:document.getElementById("f-email").value.trim(),telefono:document.getElementById("f-tel").value.trim(),plan:document.getElementById("f-plan").value};
+  const horario=document.getElementById("f-horario")?.value||"";
+  const data={nombre,monto:Number(monto),activo:activoForm,email:document.getElementById("f-email").value.trim(),telefono:document.getElementById("f-tel").value.trim(),plan:document.getElementById("f-plan").value,horario};
   const editId=document.getElementById("edit-id").value;
   if(editId){ await updateDoc(doc(db,"alumnos",editId),data); toast("Socio actualizado ✓"); }
   else{ data.fechaAlta=new Date().toISOString().slice(0,10); data.cuotas={}; await addDoc(alumnosCol,data); toast("Socio agregado ✓"); }
@@ -1266,12 +1339,22 @@ window.guardarConfig=async function(){
     cbu:document.getElementById("cfg-cbu").value.trim(),
     alias:document.getElementById("cfg-alias").value.trim(),
     titular:document.getElementById("cfg-titular").value.trim(),
+    mp_link:gymConfig.mp_link||"",
   };
   try{ await updateDoc(doc(db,"config","gym"),nuevo); }
-  catch(e){ await addDoc(configCol,{...nuevo,id:"gym"}); }
+  catch(e){ await addDoc(configCol,{...nuevo}); }
   gymConfig={...gymConfig,...nuevo};
   const el=document.getElementById("sb-gymname"); if(el) el.textContent=gymConfig.nombre;
   toast("Configuración guardada ✓"); render();
+}
+
+window.guardarConfigMP=async function(){
+  const mp_link=document.getElementById("cfg-mp-link").value.trim();
+  const nuevo={...gymConfig, mp_link};
+  try{ await updateDoc(doc(db,"config","gym"),{mp_link}); }
+  catch(e){ await addDoc(configCol,{mp_link}); }
+  gymConfig={...gymConfig, mp_link};
+  toast("Link de MercadoPago guardado ✓","blue"); render();
 }
 
 boot();
