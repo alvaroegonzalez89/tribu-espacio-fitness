@@ -411,7 +411,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ════════════════════════════════════════════
 // ⚙️  CONFIGURACIÓN — COMPLETAR ANTES DE SUBIR
@@ -491,16 +491,33 @@ function initApp(soloForm=false){
   prospectosCol = collection(db,"prospectos");
 
   if(soloForm){
-    onSnapshot(horariosCol, snap=>{ horarios=snap.docs.map(d=>({id:d.id,...d.data()})); });
+    onSnapshot(horariosCol, snap=>{
+      if(!snap.empty) HORARIOS_FIJOS = snap.docs.map(d=>d.data());
+    });
     onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym") gymConfig={...gymConfig,...d.data()}; }); });
     setTimeout(mostrarFormularioInscripcion, 800);
     return;
   }
 
   onSnapshot(alumnosCol, snap=>{ alumnos=snap.docs.map(d=>({id:d.id,...d.data()})); render(); });
-  onSnapshot(horariosCol, snap=>{ horarios=snap.docs.map(d=>({id:d.id,...d.data()})); render(); });
   onSnapshot(prospectosCol, snap=>{ prospectos=snap.docs.map(d=>({id:d.id,...d.data()})); actualizarBadgeProspectos(); render(); });
-  onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym"){ gymConfig={...gymConfig,...d.data()}; const el=document.getElementById("sb-gymname"); if(el) el.textContent=gymConfig.nombre; }}); });
+  onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym"){ gymConfig={...gymConfig,...d.data()}; const el=document.getElementById("sb-gymname"); if(el) el.textContent=gymConfig.nombre; render(); }}); });
+  // Horarios desde Firestore — si la colección está vacía, sembramos los defaults
+  onSnapshot(horariosCol, async snap=>{
+    if(snap.empty){
+      // Primera vez: guardar los defaults en Firestore
+      for(const h of HORARIOS_DEFAULT){
+        await setDoc(doc(db,"horarios",h.key.replace(/ /g,"_")), {dia:h.dia, hora:h.hora, cupos:h.cupos, key:h.key});
+      }
+    } else {
+      HORARIOS_FIJOS = snap.docs.map(d=>d.data()).sort((a,b)=>{
+        const DIAS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+        const dd=DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia);
+        return dd!==0?dd:a.hora.localeCompare(b.hora);
+      });
+      render();
+    }
+  });
 }
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -509,15 +526,13 @@ let alumnos=[], horarios=[], prospectos=[];
 let vistaActual="hero", mesVista=new Date().getMonth(), añoVista=new Date().getFullYear();
 let busqueda="", activoForm=true, pendingDeleteId=null, pendingDeleteType="alumno";
 let _comprobante=null, _transferSocio=null, _pendientesLista=[], _recIdx=0;
-let gymConfig={nombre:"Tribu | Espacio Fitness",telefono:"2604231994",direccion:"Av. 9 de Julio 351",banco:"",cbu:"",alias:"",titular:"",mp_link:""};
+let gymConfig={nombre:"Tribu | Espacio Fitness",telefono:"2604231994",direccion:"Av. 9 de Julio 351",banco:"",cbu:"0000003100063113807355",alias:"gimenaalaniz",titular:"Maria Gimena Alaniz Ferrer",mp_link:""};
 
-// ── HORARIOS FIJOS DE TRIBU ──
-const HORARIOS_FIJOS = [
-  // Lunes, Miércoles, Viernes — cupo 4
+// ── HORARIOS DE TRIBU — editables desde Configuración ──
+const HORARIOS_DEFAULT = [
   ...["Lunes","Miércoles","Viernes"].flatMap(dia =>
-    ["07:00","08:00","09:00","18:00","19:00"].map(hora => ({key:`${dia} ${hora}`, dia, hora, cupos:4}))
+    ["07:00","08:00","09:00","10:00","18:00","19:00"].map(hora => ({key:`${dia} ${hora}`, dia, hora, cupos:4}))
   ),
-  // Martes, Jueves — cupo 5 solo 14:00, resto 4
   ...["Martes","Jueves"].flatMap(dia =>
     [
       {hora:"14:00", cupos:5},
@@ -527,6 +542,10 @@ const HORARIOS_FIJOS = [
   )
 ];
 
+let HORARIOS_FIJOS = [...HORARIOS_DEFAULT];
+
+function horarioKey(dia, hora){ return `${dia} ${hora}`; }
+
 // Calcula cupos libres de un horario clave (ej "Lunes 07:00")
 function cuposLibres(key){
   const hf = HORARIOS_FIJOS.find(h=>h.key===key);
@@ -534,7 +553,7 @@ function cuposLibres(key){
   const ocupados = alumnos.filter(a => {
     if(!a.activo) return false;
     if(a.horarios && a.horarios.length) return a.horarios.includes(key);
-    return a.horario===key; // retrocompat
+    return a.horario===key;
   }).length;
   return hf.cupos - ocupados;
 }
@@ -862,8 +881,47 @@ function renderHorarios(){
 }
 
 function renderConfig(){
+  const DIAS_SEMANA = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+  const horariosRows = HORARIOS_FIJOS.length ? HORARIOS_FIJOS
+    .sort((a,b)=>{ const dd=DIAS_SEMANA.indexOf(a.dia)-DIAS_SEMANA.indexOf(b.dia); return dd!==0?dd:a.hora.localeCompare(b.hora); })
+    .map(h=>{
+      const ocupados = h.cupos - cuposLibres(h.key);
+      const puedeEliminar = ocupados === 0;
+      return `<tr>
+        <td style="font-weight:600;">${h.dia}</td>
+        <td>${h.hora}</td>
+        <td><input type="number" min="1" max="20" value="${h.cupos}" style="width:60px;background:#111;border:1px solid #222;color:#f0f0f0;padding:5px 8px;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;" onchange="editarCupoHorario('${h.key}',this.value)"/></td>
+        <td style="font-size:12px;color:#444;">${ocupados} ocupado${ocupados!==1?"s":""}</td>
+        <td>${puedeEliminar
+          ? `<button class="btn btn-danger btn-sm" onclick="eliminarHorarioConfig('${h.key}')">✕ Quitar</button>`
+          : `<span style="font-size:11px;color:#3a3a3a;">Tiene socios</span>`
+        }</td>
+      </tr>`;
+    }).join("")
+    : `<tr><td colspan="5" class="empty">No hay horarios cargados</td></tr>`;
+
+  const diaOpts = DIAS_SEMANA.map(d=>`<option>${d}</option>`).join("");
+
   return `<div class="page">
     <div class="topbar"><div><div class="eyebrow">Ajustes</div><div class="page-title">Configuración</div></div></div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header"><div class="card-title">🗓 Horarios y cupos</div><div style="font-size:12px;color:#333;">Solo podés quitar horarios sin socios asignados</div></div>
+      <table>
+        <thead><tr><th>Día</th><th>Hora</th><th>Cupos</th><th>Ocupación</th><th></th></tr></thead>
+        <tbody>${horariosRows}</tbody>
+      </table>
+      <div style="padding:18px 22px;border-top:1px solid #171717;">
+        <div style="font-size:11px;color:#444;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;margin-bottom:12px;">+ Agregar horario</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 80px auto;gap:10px;align-items:flex-end;">
+          <div><label class="fl">Día</label><select class="fi" id="new-h-dia">${diaOpts}</select></div>
+          <div><label class="fl">Hora</label><input class="fi" type="time" id="new-h-hora"/></div>
+          <div><label class="fl">Cupos</label><input class="fi" type="number" id="new-h-cupos" value="4" min="1" max="20"/></div>
+          <div><button class="btn btn-fire" style="width:100%;" onclick="agregarHorarioConfig()">+ Agregar</button></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:16px;">
       <div class="card-header"><div class="card-title">🏦 Datos del gimnasio y cobro</div></div>
       <div style="padding:24px;">
@@ -871,19 +929,20 @@ function renderConfig(){
           <div class="fg" style="grid-column:1/-1"><label class="fl">Nombre del gimnasio</label><input class="fi" id="cfg-nombre" value="${gymConfig.nombre}"/></div>
           <div class="fg"><label class="fl">Teléfono</label><input class="fi" id="cfg-telefono" value="${gymConfig.telefono||''}"/></div>
           <div class="fg"><label class="fl">Dirección</label><input class="fi" id="cfg-direccion" value="${gymConfig.direccion||''}"/></div>
-          <div class="fg"><label class="fl">Banco</label><input class="fi" id="cfg-banco" value="${gymConfig.banco||''}"/></div>
-          <div class="fg"><label class="fl">CBU</label><input class="fi" id="cfg-cbu" value="${gymConfig.cbu||''}"/></div>
+          <div class="fg" style="grid-column:1/-1"><label class="fl">Banco</label><input class="fi" id="cfg-banco" value="${gymConfig.banco||''}"/></div>
+          <div class="fg" style="grid-column:1/-1"><label class="fl">CBU / CVU</label><input class="fi" id="cfg-cbu" value="${gymConfig.cbu||''}" style="font-family:monospace;letter-spacing:0.5px;"/></div>
           <div class="fg"><label class="fl">Alias</label><input class="fi" id="cfg-alias" value="${gymConfig.alias||''}"/></div>
           <div class="fg"><label class="fl">Titular</label><input class="fi" id="cfg-titular" value="${gymConfig.titular||''}"/></div>
         </div>
-        <button class="btn btn-fire" onclick="guardarConfig()" style="margin-top:8px;">💾 Guardar</button>
+        <button class="btn btn-fire" onclick="guardarConfig()" style="margin-top:8px;">💾 Guardar datos</button>
       </div>
     </div>
+
     <div class="card">
       <div class="card-header"><div class="card-title">💳 MercadoPago</div></div>
       <div style="padding:24px;">
         <div style="background:rgba(0,196,204,0.05);border:1px solid rgba(0,196,204,0.15);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:#555;line-height:1.6;">
-          💡 Creá un link de pago en <strong style="color:var(--cyan);">mercadopago.com.ar/cobros</strong> con el monto de la membresía y pegalo acá. Aparecerá en el comprobante y en los recordatorios para que los socios paguen directo desde WhatsApp.
+          💡 Creá un link de pago en <strong style="color:var(--cyan);">mercadopago.com.ar/cobros</strong> y pegalo acá. Aparecerá en los recordatorios y comprobantes de WhatsApp.
         </div>
         <div class="fg"><label class="fl">Link de pago MercadoPago</label>
           <input class="fi" id="cfg-mp-link" value="${gymConfig.mp_link||''}" placeholder="https://mpago.la/..."/>
@@ -1479,8 +1538,7 @@ window.guardarConfig=async function(){
     titular:document.getElementById("cfg-titular").value.trim(),
     mp_link:gymConfig.mp_link||"",
   };
-  try{ await updateDoc(doc(db,"config","gym"),nuevo); }
-  catch(e){ await addDoc(configCol,{...nuevo}); }
+  await setDoc(doc(db,"config","gym"), nuevo, {merge:true});
   gymConfig={...gymConfig,...nuevo};
   const el=document.getElementById("sb-gymname"); if(el) el.textContent=gymConfig.nombre;
   toast("Configuración guardada ✓"); render();
@@ -1488,11 +1546,34 @@ window.guardarConfig=async function(){
 
 window.guardarConfigMP=async function(){
   const mp_link=document.getElementById("cfg-mp-link").value.trim();
-  const nuevo={...gymConfig, mp_link};
-  try{ await updateDoc(doc(db,"config","gym"),{mp_link}); }
-  catch(e){ await addDoc(configCol,{mp_link}); }
+  await setDoc(doc(db,"config","gym"), {mp_link}, {merge:true});
   gymConfig={...gymConfig, mp_link};
   toast("Link de MercadoPago guardado ✓","blue"); render();
+}
+
+window.agregarHorarioConfig=async function(){
+  const dia=document.getElementById("new-h-dia").value;
+  const horaRaw=document.getElementById("new-h-hora").value;
+  const cupos=Number(document.getElementById("new-h-cupos").value||4);
+  if(!horaRaw){ toast("Elegí una hora","err"); return; }
+  const hora=horaRaw.length===5?horaRaw:horaRaw+":00";
+  const key=`${dia} ${hora}`;
+  if(HORARIOS_FIJOS.find(h=>h.key===key)){ toast("Ese horario ya existe","err"); return; }
+  await setDoc(doc(db,"horarios",key.replace(/ /g,"_")), {dia, hora, cupos, key});
+  toast(`Horario ${key} agregado ✓`);
+}
+
+window.eliminarHorarioConfig=async function(key){
+  const ocupados = (HORARIOS_FIJOS.find(h=>h.key===key)?.cupos||0) - cuposLibres(key);
+  if(ocupados>0){ toast("No podés eliminar un horario con socios asignados","err"); return; }
+  await deleteDoc(doc(db,"horarios",key.replace(/ /g,"_")));
+  toast("Horario eliminado");
+}
+
+window.editarCupoHorario=async function(key, valor){
+  const cupos=Math.max(1,Number(valor));
+  await setDoc(doc(db,"horarios",key.replace(/ /g,"_")), {cupos}, {merge:true});
+  toast(`Cupo de ${key} → ${cupos}`);
 }
 
 boot();
