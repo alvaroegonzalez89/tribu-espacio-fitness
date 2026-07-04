@@ -444,7 +444,7 @@ window.doLogin=function(){
     sessionStorage.setItem("tribu_auth","1");
     document.getElementById("login-screen").style.display="none";
     document.getElementById("app").style.display="flex";
-    document.getElementById("bottom-nav").style.display="flex";
+    if(window.innerWidth<=860) document.getElementById("bottom-nav").style.display="flex";
     initApp();
   } else {
     err.textContent="Usuario o contraseña incorrectos";
@@ -470,7 +470,7 @@ function boot(){
   if(checkSession()){
     document.getElementById("login-screen").style.display="none";
     document.getElementById("app").style.display="flex";
-    document.getElementById("bottom-nav").style.display="flex";
+    if(window.innerWidth<=860) document.getElementById("bottom-nav").style.display="flex";
     initApp();
   }
   // else: login screen ya visible por defecto
