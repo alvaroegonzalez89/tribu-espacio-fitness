@@ -494,8 +494,21 @@ function initApp(soloForm=false){
     onSnapshot(horariosCol, snap=>{
       if(!snap.empty) HORARIOS_FIJOS = snap.docs.map(d=>d.data());
     });
+    onSnapshot(alumnosCol, snap=>{
+      alumnos = snap.docs.map(d=>({id:d.id,...d.data()}));
+      // Si el formulario ya está visible, actualizar los selectores preservando lo elegido
+      if(document.getElementById("ins-horarios-wrap")){
+        // Guardar selecciones actuales antes de re-renderizar
+        const cant = window._insPlan && window._insPlan.includes("3 veces") ? 3 : 2;
+        for(let i=0;i<cant;i++){
+          const el=document.getElementById(`ins-horario-${i}`);
+          if(el && el.value) window._insHorarios[i]=el.value;
+        }
+        renderHorariosFormulario();
+      }
+    });
     onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym") gymConfig={...gymConfig,...d.data()}; }); });
-    setTimeout(mostrarFormularioInscripcion, 800);
+    setTimeout(mostrarFormularioInscripcion, 900);
     return;
   }
 
@@ -546,16 +559,19 @@ let HORARIOS_FIJOS = [...HORARIOS_DEFAULT];
 
 function horarioKey(dia, hora){ return `${dia} ${hora}`; }
 
-// Calcula cupos libres de un horario clave (ej "Lunes 07:00")
+// Helper unificado — busca en array horarios[] Y en campo legacy horario
+function sociosEnHorario(key){
+  return alumnos.filter(a => {
+    if(!a.activo) return false;
+    if(a.horarios && a.horarios.length) return a.horarios.includes(key);
+    return a.horario === key;
+  });
+}
+
 function cuposLibres(key){
   const hf = HORARIOS_FIJOS.find(h=>h.key===key);
   if(!hf) return 0;
-  const ocupados = alumnos.filter(a => {
-    if(!a.activo) return false;
-    if(a.horarios && a.horarios.length) return a.horarios.includes(key);
-    return a.horario===key;
-  }).length;
-  return hf.cupos - ocupados;
+  return hf.cupos - sociosEnHorario(key).length;
 }
 
 function clavesMes(){ return `${añoVista}-${mesVista}`; }
@@ -833,7 +849,7 @@ function renderHorarios(){
       const colorBar = libres===0?"#ff5050":libres===1?"#ff8c00":libres<=2?"#ffd23f":"#39d353";
       const colorText = libres===0?"cupos-lleno":libres===1?"cupos-bajo":"cupos-ok";
       // Lista de socios en este horario
-      const enEsteHorario = alumnos.filter(a=>a.activo&&(a.horario===h.key||(a.horario2&&a.horario2===h.key)));
+      const enEsteHorario = sociosEnHorario(h.key);
       const sociosList = enEsteHorario.length ? enEsteHorario.map(a=>`
         <div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid #1a1a1a;">
           <div style="width:22px;height:22px;border-radius:50%;background:${avatarColor(a.nombre)};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${a.nombre[0]}</div>
