@@ -245,7 +245,6 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     <div class="nav-item" onclick="navTo('cuotas')"><span class="ni">◎</span> Cuotas</div>
     <div class="nav-item" id="nav-prospectos" onclick="navTo('prospectos')"><span class="ni">📝</span> Formulario <span class="nav-badge" id="badge-prospectos" style="display:none">0</span></div>
     <div class="nav-item" onclick="navTo('horarios')"><span class="ni">🗓</span> Horarios</div>
-    <div class="nav-item" onclick="navTo('agenda')"><span class="ni">📋</span> Agenda</div>
     <div class="nav-item" onclick="navTo('config')"><span class="ni">⚙</span> Configuración</div>
     <div class="sb-footer"><span>v2.0 · Tribu</span><button class="sb-logout" onclick="doLogout()">Salir</button></div>
   </nav>
@@ -260,7 +259,6 @@ tr:hover td{background:rgba(255,255,255,0.01);}
   <div class="bn-item" onclick="navTo('cuotas')"><span class="bn-icon">📅</span>Cuotas</div>
   <div class="bn-item" onclick="navTo('prospectos')"><span class="bn-icon">📝</span>Formulario<span class="bn-badge" id="bn-badge" style="display:none">0</span></div>
   <div class="bn-item" onclick="navTo('horarios')"><span class="bn-icon">🗓</span>Horarios</div>
-  <div class="bn-item" onclick="navTo('agenda')"><span class="bn-icon">📋</span>Agenda</div>
   <div class="bn-item" onclick="navTo('config')"><span class="bn-icon">⚙</span>Config</div>
 </nav>
 
@@ -464,13 +462,9 @@ window.doLogout=function(){
 function boot(){
   const params=new URLSearchParams(window.location.search);
   if(params.get("inscripcion")==="1"){
+    // formulario público — no requiere login
     document.getElementById("login-screen").style.display="none";
     initApp(true);
-    return;
-  }
-  if(params.get("agenda")==="1"){
-    document.getElementById("login-screen").style.display="none";
-    initApp(false, true);
     return;
   }
   if(checkSession()){
@@ -479,12 +473,13 @@ function boot(){
     if(window.innerWidth<=860) document.getElementById("bottom-nav").style.display="flex";
     initApp();
   }
+  // else: login screen ya visible por defecto
 }
 
-let db, alumnosCol, configCol, horariosCol, prospectosCol, reservasCol;
+let db, alumnosCol, configCol, horariosCol, prospectosCol;
 let appInited=false;
 
-function initApp(soloForm=false, soloAgenda=false){
+function initApp(soloForm=false){
   if(appInited) return;
   appInited=true;
 
@@ -494,16 +489,6 @@ function initApp(soloForm=false, soloAgenda=false){
   configCol     = collection(db,"config");
   horariosCol   = collection(db,"horarios");
   prospectosCol = collection(db,"prospectos");
-  reservasCol   = collection(db,"reservas");
-
-  if(soloAgenda){
-    onSnapshot(alumnosCol, snap=>{ alumnos=snap.docs.map(d=>({id:d.id,...d.data()})); });
-    onSnapshot(horariosCol, snap=>{ if(!snap.empty) HORARIOS_FIJOS=snap.docs.map(d=>d.data()); });
-    onSnapshot(reservasCol, snap=>{ reservas=snap.docs.map(d=>({id:d.id,...d.data()})); });
-    onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym") gymConfig={...gymConfig,...d.data()}; }); });
-    setTimeout(mostrarAgendaPublica, 900);
-    return;
-  }
 
   if(soloForm){
     onSnapshot(horariosCol, snap=>{
@@ -529,10 +514,6 @@ function initApp(soloForm=false, soloAgenda=false){
 
   onSnapshot(alumnosCol, snap=>{ alumnos=snap.docs.map(d=>({id:d.id,...d.data()})); render(); });
   onSnapshot(prospectosCol, snap=>{ prospectos=snap.docs.map(d=>({id:d.id,...d.data()})); actualizarBadgeProspectos(); render(); });
-  onSnapshot(reservasCol, snap=>{
-    reservas=snap.docs.map(d=>({id:d.id,...d.data()}));
-    render();
-  });
   onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym"){ gymConfig={...gymConfig,...d.data()}; const el=document.getElementById("sb-gymname"); if(el) el.textContent=gymConfig.nombre; render(); }}); });
   // Horarios desde Firestore — si la colección está vacía, sembramos los defaults
   onSnapshot(horariosCol, async snap=>{
@@ -554,7 +535,7 @@ function initApp(soloForm=false, soloAgenda=false){
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS_ORDEN = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
-let alumnos=[], horarios=[], prospectos=[], reservas=[];
+let alumnos=[], horarios=[], prospectos=[];
 let vistaActual="hero", mesVista=new Date().getMonth(), añoVista=new Date().getFullYear();
 let busqueda="", activoForm=true, pendingDeleteId=null, pendingDeleteType="alumno";
 let _comprobante=null, _transferSocio=null, _pendientesLista=[], _recIdx=0;
@@ -614,7 +595,7 @@ function actualizarBadgeProspectos(){
 window.navTo=function(v){
   vistaActual=v;
   document.querySelectorAll(".nav-item").forEach(el=>el.classList.remove("active"));
-  const order=["hero","dashboard","alumnos","cuotas","prospectos","horarios","agenda","config"];
+  const order=["hero","dashboard","alumnos","cuotas","prospectos","horarios","config"];
   const items=document.querySelectorAll(".nav-item");
   const idx=order.indexOf(v);
   if(items[idx]) items[idx].classList.add("active");
@@ -631,7 +612,6 @@ function render(){
   if(vistaActual==="cuotas")      main.innerHTML=renderCuotas();
   if(vistaActual==="prospectos")  main.innerHTML=renderProspectos();
   if(vistaActual==="horarios")    main.innerHTML=renderHorarios();
-  if(vistaActual==="agenda")      main.innerHTML=renderAgendaAdmin();
   if(vistaActual==="config")      main.innerHTML=renderConfig();
 }
 
@@ -1612,77 +1592,7 @@ window.editarCupoHorario=async function(key, valor){
   toast(`Cupo de ${key} → ${cupos}`);
 }
 
-
-// ════════════════════════════════════════
-// AGENDA PÚBLICA — ?agenda=1
-// ════════════════════════════════════════
-
-function fechaKey(d){ return d.toISOString().slice(0,10); }
-function hoy(){ return new Date(); }
-function diasSemana(desde){
-  const dias=[];
-  const d=new Date(desde);
-  d.setHours(0,0,0,0);
-  // Siempre mostrar lunes a viernes de la semana actual + próxima
-  const lunes=new Date(d);
-  const dow=d.getDay();
-  lunes.setDate(d.getDate()-(dow===0?6:dow-1));
-  for(let i=0;i<14;i++){
-    const dd=new Date(lunes);
-    dd.setDate(lunes.getDate()+i);
-    if(dd.getDay()>=1&&dd.getDay()<=5) dias.push(new Date(dd));
-  }
-  return dias;
-}
-
-const DIAS_ES=["","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
-const MESES_ES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-
-function formatFecha(d){
-  return `${DIAS_ES[d.getDay()]} ${d.getDate()} de ${MESES_ES[d.getMonth()]}`;
-}
-
-function reservasDelDia(fechaStr){
-  const ahora=new Date();
-  return reservas.filter(r=>r.fecha===fechaStr);
-}
-
-function reservasAlumnoSemana(nombreAlumno, semanaLunes){
-  // contar reservas del alumno en los 7 días desde semanaLunes
-  const desde=new Date(semanaLunes); desde.setHours(0,0,0,0);
-  const hasta=new Date(desde); hasta.setDate(desde.getDate()+6);
-  return reservas.filter(r=>{
-    if(r.alumnoNombre!==nombreAlumno) return false;
-    const fr=new Date(r.fecha+'T00:00:00');
-    return fr>=desde && fr<=hasta;
-  });
-}
-
-function getLunesDe(fecha){
-  const d=new Date(fecha); d.setHours(0,0,0,0);
-  const dow=d.getDay();
-  d.setDate(d.getDate()-(dow===0?6:dow-1));
-  return d;
-}
-
-function cuposLibresAgenda(fechaStr, horarioKey){
-  const hf=HORARIOS_FIJOS.find(h=>h.key===horarioKey);
-  if(!hf) return 0;
-  const ocupados=reservasDelDia(fechaStr).filter(r=>r.horario===horarioKey).length;
-  return hf.cupos - ocupados;
-}
-
-// ── VISTA PÚBLICA ──
-
-// ═══════════════════════════════════════════════════
-// AGENDA — helper: reservas ya cargadas de horarios fijos
-// ═══════════════════════════════════════════════════
-
-function seedReservasHorariosFijos(alumnoId, alumnoNombre){
-  // Pre-reservar los días de la semana actual según horarios asignados
-  // Solo si el alumno NO tiene ninguna reserva esta semana todavía
-}
-
+boot();
 </script>
 </body>
 </html>
