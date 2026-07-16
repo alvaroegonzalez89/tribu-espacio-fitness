@@ -245,6 +245,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     <div class="nav-item" onclick="navTo('cuotas')"><span class="ni">◎</span> Cuotas</div>
     <div class="nav-item" id="nav-prospectos" onclick="navTo('prospectos')"><span class="ni">📝</span> Formulario <span class="nav-badge" id="badge-prospectos" style="display:none">0</span></div>
     <div class="nav-item" onclick="navTo('horarios')"><span class="ni">🗓</span> Horarios</div>
+    <div class="nav-item" onclick="navTo('agenda')"><span class="ni">📋</span> Agenda</div>
     <div class="nav-item" onclick="navTo('config')"><span class="ni">⚙</span> Configuración</div>
     <div class="sb-footer"><span>v2.0 · Tribu</span><button class="sb-logout" onclick="doLogout()">Salir</button></div>
   </nav>
@@ -259,6 +260,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
   <div class="bn-item" onclick="navTo('cuotas')"><span class="bn-icon">📅</span>Cuotas</div>
   <div class="bn-item" onclick="navTo('prospectos')"><span class="bn-icon">📝</span>Formulario<span class="bn-badge" id="bn-badge" style="display:none">0</span></div>
   <div class="bn-item" onclick="navTo('horarios')"><span class="bn-icon">🗓</span>Horarios</div>
+  <div class="bn-item" onclick="navTo('agenda')"><span class="bn-icon">📋</span>Agenda</div>
   <div class="bn-item" onclick="navTo('config')"><span class="bn-icon">⚙</span>Config</div>
 </nav>
 
@@ -462,9 +464,13 @@ window.doLogout=function(){
 function boot(){
   const params=new URLSearchParams(window.location.search);
   if(params.get("inscripcion")==="1"){
-    // formulario público — no requiere login
     document.getElementById("login-screen").style.display="none";
     initApp(true);
+    return;
+  }
+  if(params.get("agenda")==="1"){
+    document.getElementById("login-screen").style.display="none";
+    initApp(false, true);
     return;
   }
   if(checkSession()){
@@ -473,13 +479,12 @@ function boot(){
     if(window.innerWidth<=860) document.getElementById("bottom-nav").style.display="flex";
     initApp();
   }
-  // else: login screen ya visible por defecto
 }
 
-let db, alumnosCol, configCol, horariosCol, prospectosCol;
+let db, alumnosCol, configCol, horariosCol, prospectosCol, reservasCol;
 let appInited=false;
 
-function initApp(soloForm=false){
+function initApp(soloForm=false, soloAgenda=false){
   if(appInited) return;
   appInited=true;
 
@@ -489,6 +494,16 @@ function initApp(soloForm=false){
   configCol     = collection(db,"config");
   horariosCol   = collection(db,"horarios");
   prospectosCol = collection(db,"prospectos");
+  reservasCol   = collection(db,"reservas");
+
+  if(soloAgenda){
+    onSnapshot(alumnosCol, snap=>{ alumnos=snap.docs.map(d=>({id:d.id,...d.data()})); });
+    onSnapshot(horariosCol, snap=>{ if(!snap.empty) HORARIOS_FIJOS=snap.docs.map(d=>d.data()); });
+    onSnapshot(reservasCol, snap=>{ reservas=snap.docs.map(d=>({id:d.id,...d.data()})); });
+    onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym") gymConfig={...gymConfig,...d.data()}; }); });
+    setTimeout(mostrarAgendaPublica, 900);
+    return;
+  }
 
   if(soloForm){
     onSnapshot(horariosCol, snap=>{
@@ -514,6 +529,7 @@ function initApp(soloForm=false){
 
   onSnapshot(alumnosCol, snap=>{ alumnos=snap.docs.map(d=>({id:d.id,...d.data()})); render(); });
   onSnapshot(prospectosCol, snap=>{ prospectos=snap.docs.map(d=>({id:d.id,...d.data()})); actualizarBadgeProspectos(); render(); });
+  onSnapshot(reservasCol, snap=>{ reservas=snap.docs.map(d=>({id:d.id,...d.data()})); render(); });
   onSnapshot(configCol, snap=>{ snap.docs.forEach(d=>{ if(d.id==="gym"){ gymConfig={...gymConfig,...d.data()}; const el=document.getElementById("sb-gymname"); if(el) el.textContent=gymConfig.nombre; render(); }}); });
   // Horarios desde Firestore — si la colección está vacía, sembramos los defaults
   onSnapshot(horariosCol, async snap=>{
@@ -535,7 +551,7 @@ function initApp(soloForm=false){
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS_ORDEN = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
-let alumnos=[], horarios=[], prospectos=[];
+let alumnos=[], horarios=[], prospectos=[], reservas=[];
 let vistaActual="hero", mesVista=new Date().getMonth(), añoVista=new Date().getFullYear();
 let busqueda="", activoForm=true, pendingDeleteId=null, pendingDeleteType="alumno";
 let _comprobante=null, _transferSocio=null, _pendientesLista=[], _recIdx=0;
@@ -595,7 +611,7 @@ function actualizarBadgeProspectos(){
 window.navTo=function(v){
   vistaActual=v;
   document.querySelectorAll(".nav-item").forEach(el=>el.classList.remove("active"));
-  const order=["hero","dashboard","alumnos","cuotas","prospectos","horarios","config"];
+  const order=["hero","dashboard","alumnos","cuotas","prospectos","horarios","agenda","config"];
   const items=document.querySelectorAll(".nav-item");
   const idx=order.indexOf(v);
   if(items[idx]) items[idx].classList.add("active");
@@ -612,6 +628,7 @@ function render(){
   if(vistaActual==="cuotas")      main.innerHTML=renderCuotas();
   if(vistaActual==="prospectos")  main.innerHTML=renderProspectos();
   if(vistaActual==="horarios")    main.innerHTML=renderHorarios();
+  if(vistaActual==="agenda")      main.innerHTML=renderAgendaAdmin();
   if(vistaActual==="config")      main.innerHTML=renderConfig();
 }
 
@@ -1590,6 +1607,333 @@ window.editarCupoHorario=async function(key, valor){
   const cupos=Math.max(1,Number(valor));
   await setDoc(doc(db,"horarios",key.replace(/ /g,"_")), {cupos}, {merge:true});
   toast(`Cupo de ${key} → ${cupos}`);
+}
+
+
+// ════════════════════════════════════════
+// AGENDA PÚBLICA — ?agenda=1
+// ════════════════════════════════════════
+
+function fechaKey(d){ return d.toISOString().slice(0,10); }
+function hoy(){ return new Date(); }
+function diasSemana(desde){
+  const dias=[];
+  const d=new Date(desde);
+  d.setHours(0,0,0,0);
+  // Siempre mostrar lunes a viernes de la semana actual + próxima
+  const lunes=new Date(d);
+  const dow=d.getDay();
+  lunes.setDate(d.getDate()-(dow===0?6:dow-1));
+  for(let i=0;i<14;i++){
+    const dd=new Date(lunes);
+    dd.setDate(lunes.getDate()+i);
+    if(dd.getDay()>=1&&dd.getDay()<=5) dias.push(new Date(dd));
+  }
+  return dias;
+}
+
+const DIAS_ES=["","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
+const MESES_ES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+function formatFecha(d){
+  return `${DIAS_ES[d.getDay()]} ${d.getDate()} de ${MESES_ES[d.getMonth()]}`;
+}
+
+function reservasDelDia(fechaStr){
+  const ahora=new Date();
+  return reservas.filter(r=>r.fecha===fechaStr);
+}
+
+function reservasAlumnoSemana(nombreAlumno, semanaLunes){
+  // contar reservas del alumno en los 7 días desde semanaLunes
+  const desde=new Date(semanaLunes); desde.setHours(0,0,0,0);
+  const hasta=new Date(desde); hasta.setDate(desde.getDate()+6);
+  return reservas.filter(r=>{
+    if(r.alumnoNombre!==nombreAlumno) return false;
+    const fr=new Date(r.fecha+'T00:00:00');
+    return fr>=desde && fr<=hasta;
+  });
+}
+
+function getLunesDe(fecha){
+  const d=new Date(fecha); d.setHours(0,0,0,0);
+  const dow=d.getDay();
+  d.setDate(d.getDate()-(dow===0?6:dow-1));
+  return d;
+}
+
+function cuposLibresAgenda(fechaStr, horarioKey){
+  const hf=HORARIOS_FIJOS.find(h=>h.key===horarioKey);
+  if(!hf) return 0;
+  const ocupados=reservasDelDia(fechaStr).filter(r=>r.horario===horarioKey).length;
+  return hf.cupos - ocupados;
+}
+
+// ── VISTA PÚBLICA ──
+function mostrarAgendaPublica(){
+  document.body.innerHTML=`
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#0a0a0a;color:#f0f0f0;font-family:'Outfit',sans-serif;min-height:100vh;}
+    .ag-wrap{max-width:520px;margin:0 auto;padding:20px 16px 80px;}
+    .ag-hero{background:#0f1a10;border:1px solid rgba(57,211,83,0.2);border-radius:16px;padding:22px;text-align:center;margin-bottom:20px;display:flex;align-items:center;gap:14px;}
+    .ag-logo{width:52px;height:52px;border-radius:50%;border:2px solid rgba(57,211,83,0.3);flex-shrink:0;}
+    .ag-hero-text{text-align:left;}
+    .ag-hero-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;}
+    .ag-hero-sub{font-size:12px;color:#555;margin-top:2px;}
+    .ag-login{background:#111;border:1px solid #1e1e1e;border-radius:14px;padding:22px;margin-bottom:20px;}
+    .ag-login-title{font-size:11px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;}
+    .fi{width:100%;background:#0f0f0f;border:1px solid #222;color:#f0f0f0;padding:11px 14px;border-radius:10px;font-size:14px;font-family:'Outfit',sans-serif;outline:none;margin-bottom:10px;}
+    .fi:focus{border-color:#39d353;}
+    .btn-ag{width:100%;padding:12px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:700;font-family:'Outfit',sans-serif;background:linear-gradient(135deg,#39d353,#00c4cc);color:#0a0a0a;}
+    .ag-alumno-info{background:rgba(57,211,83,0.06);border:1px solid rgba(57,211,83,0.2);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+    .ag-alumno-name{font-weight:700;font-size:15px;}
+    .ag-alumno-plan{font-size:11px;color:#555;margin-top:2px;}
+    .ag-cambiar{font-size:11px;color:#444;cursor:pointer;text-decoration:underline;}
+    .ag-semana-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+    .ag-semana-label{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.5px;}
+    .ag-nav-btn{background:#111;border:1px solid #222;color:#888;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:18px;font-family:'Outfit',sans-serif;}
+    .ag-nav-btn:hover{border-color:#39d353;color:#39d353;}
+    .ag-dia-block{background:#111;border:1px solid #1e1e1e;border-radius:12px;margin-bottom:12px;overflow:hidden;}
+    .ag-dia-header{padding:12px 16px;background:#161616;border-bottom:1px solid #1e1e1e;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:space-between;}
+    .ag-dia-fecha{font-size:11px;color:#444;font-weight:400;}
+    .ag-slot{padding:11px 16px;border-bottom:1px solid #0f0f0f;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .ag-slot:last-child{border-bottom:none;}
+    .ag-slot-hora{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.5px;min-width:52px;}
+    .ag-slot-info{flex:1;}
+    .ag-slot-cupos{font-size:11px;margin-top:2px;}
+    .cupos-ok{color:#39d353;}.cupos-bajo{color:#ff8c00;}.cupos-lleno{color:#ff5050;}
+    .ag-slot-reservados{font-size:11px;color:#333;margin-top:3px;}
+    .btn-reservar{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:'Outfit',sans-serif;transition:all 0.15s;white-space:nowrap;}
+    .btn-anotarse{background:rgba(57,211,83,0.12);color:#39d353;border:1px solid rgba(57,211,83,0.3);}
+    .btn-anotarse:hover{background:rgba(57,211,83,0.25);}
+    .btn-cancelar{background:rgba(255,80,80,0.1);color:#ff5050;border:1px solid rgba(255,80,80,0.2);}
+    .btn-cancelar:hover{background:rgba(255,80,80,0.2);}
+    .btn-lleno{background:#111;color:#333;border:1px solid #1e1e1e;cursor:not-allowed;}
+    .ag-limite{background:rgba(255,140,0,0.07);border:1px solid rgba(255,140,0,0.2);border-radius:10px;padding:10px 14px;font-size:12px;color:#ff8c00;margin-bottom:14px;}
+    .ag-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0b1f10;border:1px solid #39d353;color:#39d353;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:999;animation:tin 0.2s ease;}
+    @keyframes tin{from{transform:translateX(-50%) translateY(10px);opacity:0;}to{transform:translateX(-50%) translateY(0);opacity:1;}}
+    .ag-mis-reservas{background:rgba(0,196,204,0.05);border:1px solid rgba(0,196,204,0.15);border-radius:10px;padding:12px 14px;margin-bottom:16px;}
+    .ag-mis-title{font-size:10px;color:#00c4cc;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:8px;}
+    .ag-mi-res{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(0,196,204,0.08);}
+    .ag-mi-res:last-child{border-bottom:none;}
+    .ag-vacio{padding:30px;text-align:center;color:#2a2a2a;font-size:13px;}
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <div class="ag-wrap">
+    <div class="ag-hero">
+      <img class="ag-logo" src="${LOGO_SRC}" alt="Tribu"/>
+      <div class="ag-hero-text">
+        <div class="ag-hero-title">AGENDA DE TURNOS</div>
+        <div class="ag-hero-sub">Tribu | Espacio Fitness</div>
+      </div>
+    </div>
+    <div id="ag-contenido">
+      <div class="ag-login">
+        <div class="ag-login-title">¿Quién sos?</div>
+        <input class="fi" id="ag-nombre-input" placeholder="Tu nombre completo" onkeydown="if(event.key==='Enter') buscarAlumnoAgenda()"/>
+        <button class="btn-ag" onclick="buscarAlumnoAgenda()">Ingresar →</button>
+        <div id="ag-login-error" style="font-size:12px;color:#ff5050;margin-top:8px;min-height:16px;"></div>
+      </div>
+    </div>
+  </div>`;
+
+  window._agSemanaOffset=0;
+  window._agAlumno=null;
+}
+
+window.buscarAlumnoAgenda=function(){
+  const nombre=document.getElementById("ag-nombre-input").value.trim();
+  const errEl=document.getElementById("ag-login-error");
+  if(!nombre){ errEl.textContent="Ingresá tu nombre"; return; }
+  // Buscar coincidencia parcial case-insensitive
+  const encontrado=alumnos.find(a=>a.activo && a.nombre.toLowerCase().includes(nombre.toLowerCase()));
+  if(!encontrado){ errEl.textContent="No te encontramos como socio activo. Verificá tu nombre."; return; }
+  window._agAlumno=encontrado;
+  renderAgendaAlumno();
+}
+
+window.renderAgendaAlumno=function(){
+  const a=window._agAlumno;
+  const offset=window._agSemanaOffset||0;
+  const hoyDate=new Date(); hoyDate.setHours(0,0,0,0);
+  const lunesBase=getLunesDe(hoyDate);
+  lunesBase.setDate(lunesBase.getDate()+offset*7);
+  const dias=diasSemana(lunesBase).filter(d=>d>=hoyDate); // no mostrar días pasados en semana actual
+  const cantMax=a.plan&&a.plan.includes("3 veces")?3:2;
+  const resAlumnoSemana=reservasAlumnoSemana(a.nombre, lunesDate(offset));
+  const limite=resAlumnoSemana.length>=cantMax;
+
+  const semanaLabel=offset===0?"Esta semana":offset===1?"Próxima semana":`En ${offset} semanas`;
+
+  let diasHtml="";
+  dias.forEach(d=>{
+    const fk=fechaKey(d);
+    const nombre_dia=DIAS_ES[d.getDay()];
+    const slots=HORARIOS_FIJOS.filter(h=>h.dia===nombre_dia).sort((a,b)=>a.hora.localeCompare(b.hora));
+    if(!slots.length) return;
+    let slotsHtml="";
+    slots.forEach(h=>{
+      const libres=cuposLibresAgenda(fk,h.key);
+      const miRes=reservas.find(r=>r.fecha===fk&&r.horario===h.key&&r.alumnoNombre===a.nombre);
+      const reservadosCount=reservasDelDia(fk).filter(r=>r.horario===h.key).length;
+      const colorCupos=libres<=0?"cupos-lleno":libres<=1?"cupos-bajo":"cupos-ok";
+      let btn="";
+      if(miRes){
+        btn=`<button class="btn-reservar btn-cancelar" onclick="cancelarReserva('${miRes.id}')">✕ Cancelar</button>`;
+      } else if(libres<=0){
+        btn=`<button class="btn-reservar btn-lleno" disabled>Sin cupos</button>`;
+      } else if(limite){
+        btn=`<button class="btn-reservar btn-lleno" disabled title="Límite semanal">Límite</button>`;
+      } else {
+        btn=`<button class="btn-reservar btn-anotarse" onclick="hacerReserva('${fk}','${h.key}','${a.nombre}','${a.id}')">+ Anotarme</button>`;
+      }
+      slotsHtml+=`<div class="ag-slot">
+        <div class="ag-slot-hora">${h.hora}</div>
+        <div class="ag-slot-info">
+          <div style="font-size:13px;font-weight:${miRes?"700":"400"};color:${miRes?"#39d353":"#ccc"};">${miRes?"✓ Reservado":"Disponible"}</div>
+          <div class="ag-slot-cupos ${colorCupos}">${libres<=0?"Sin cupos":`${libres} cupo${libres!==1?"s":""} libre${libres!==1?"s":""}`}</div>
+        </div>
+        ${btn}
+      </div>`;
+    });
+    diasHtml+=`<div class="ag-dia-block">
+      <div class="ag-dia-header"><span>${nombre_dia}</span><span class="ag-dia-fecha">${d.getDate()} de ${MESES_ES[d.getMonth()]}</span></div>
+      ${slotsHtml}
+    </div>`;
+  });
+  if(!diasHtml) diasHtml=`<div class="ag-vacio">No hay más días disponibles esta semana</div>`;
+
+  // Mis reservas de esta semana
+  let misResHtml="";
+  if(resAlumnoSemana.length){
+    misResHtml=`<div class="ag-mis-reservas">
+      <div class="ag-mis-title">Mis turnos esta semana (${resAlumnoSemana.length}/${cantMax})</div>
+      ${resAlumnoSemana.sort((a,b)=>a.fecha.localeCompare(b.fecha)).map(r=>{
+        const fd=new Date(r.fecha+'T00:00:00');
+        return `<div class="ag-mi-res"><span>${DIAS_ES[fd.getDay()]} ${r.horario.split(' ')[1]}</span><span style="color:#39d353;font-size:11px;">✓ Reservado</span></div>`;
+      }).join("")}
+    </div>`;
+  }
+
+  const limiteHtml=limite&&!resAlumnoSemana.find(r=>{ const fd=new Date(r.fecha+'T00:00:00'); return fd>=lunesBase; })?""
+    :`${limite?`<div class="ag-limite">⚠️ Ya tenés ${cantMax} turnos reservados esta semana (límite de tu plan)</div>`:""}`;
+
+  document.getElementById("ag-contenido").innerHTML=`
+    <div class="ag-alumno-info">
+      <div>
+        <div class="ag-alumno-name">${a.nombre}</div>
+        <div class="ag-alumno-plan">${a.plan||"Plan mensual"}</div>
+      </div>
+      <span class="ag-cambiar" onclick="cambiarAlumno()">No soy yo</span>
+    </div>
+    ${misResHtml}
+    ${limiteHtml}
+    <div class="ag-semana-nav">
+      <button class="ag-nav-btn" onclick="cambiarSemanaAg(-1)" ${offset<=0?"disabled style='opacity:0.3'":""}>‹</button>
+      <div class="ag-semana-label">${semanaLabel}</div>
+      <button class="ag-nav-btn" onclick="cambiarSemanaAg(1)" ${offset>=2?"disabled style='opacity:0.3'":""}>›</button>
+    </div>
+    ${diasHtml}`;
+}
+
+function lunesDate(offset){
+  const h=new Date(); h.setHours(0,0,0,0);
+  const l=getLunesDe(h); l.setDate(l.getDate()+offset*7);
+  return l;
+}
+
+window.hacerReserva=async function(fecha, horario, alumnoNombre, alumnoId){
+  await addDoc(reservasCol,{fecha, horario, alumnoNombre, alumnoId, ts:Date.now()});
+  agToast("✓ Turno reservado");
+}
+
+window.cancelarReserva=async function(id){
+  await deleteDoc(doc(db,"reservas",id));
+  agToast("Turno cancelado");
+}
+
+window.cambiarSemanaAg=function(dir){
+  window._agSemanaOffset=(window._agSemanaOffset||0)+dir;
+  if(window._agSemanaOffset<0) window._agSemanaOffset=0;
+  if(window._agSemanaOffset>2) window._agSemanaOffset=2;
+  renderAgendaAlumno();
+}
+
+window.cambiarAlumno=function(){
+  window._agAlumno=null;
+  mostrarAgendaPublica();
+}
+
+function agToast(msg){
+  const t=document.createElement("div");
+  t.className="ag-toast"; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2500);
+  // Re-render after action
+  setTimeout(()=>{ if(window._agAlumno) renderAgendaAlumno(); },400);
+}
+
+// ── VISTA ADMIN — renderAgendaAdmin ──
+function renderAgendaAdmin(){
+  const hoyDate=new Date(); hoyDate.setHours(0,0,0,0);
+  const lunesBase=getLunesDe(hoyDate);
+  // Mostrar semana actual LUN-VIE
+  const diasSem=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(lunesBase); d.setDate(lunesBase.getDate()+i);
+    if(d.getDay()>=1&&d.getDay()<=5) diasSem.push(d);
+  }
+  const linkAgenda=`${window.location.origin}${window.location.pathname}?agenda=1`;
+
+  let diasHtml="";
+  diasSem.forEach(d=>{
+    const fk=fechaKey(d);
+    const nombre_dia=DIAS_ES[d.getDay()];
+    const esHoy=fechaKey(d)===fechaKey(hoyDate);
+    const slots=HORARIOS_FIJOS.filter(h=>h.dia===nombre_dia).sort((a,b)=>a.hora.localeCompare(b.hora));
+    if(!slots.length) return;
+    let slotsHtml="";
+    slots.forEach(h=>{
+      const reservadosSlot=reservas.filter(r=>r.fecha===fk&&r.horario===h.key);
+      const libres=h.cupos-reservadosSlot.length;
+      const colorBar=libres<=0?"#ff5050":libres<=1?"#ff8c00":"#39d353";
+      const pct=Math.round(((h.cupos-libres)/h.cupos)*100);
+      const nombresHtml=reservadosSlot.length
+        ?reservadosSlot.map(r=>`<div style="display:flex;align-items:center;gap:7px;padding:3px 0;">
+            <div style="width:20px;height:20px;border-radius:50%;background:${avatarColor(r.alumnoNombre)};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;">${r.alumnoNombre[0]}</div>
+            <span style="font-size:12px;color:#aaa;">${r.alumnoNombre}</span>
+          </div>`).join("")
+        :`<div style="font-size:11px;color:#2a2a2a;padding:4px 0;">Sin reservas aún</div>`;
+      slotsHtml+=`<div style="padding:12px 16px;border-bottom:1px solid #0f0f0f;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;">${h.hora}</span>
+          <span style="font-size:12px;font-weight:700;color:${colorBar};">${h.cupos-reservadosSlot.length}/${h.cupos} libres</span>
+        </div>
+        <div style="height:3px;background:#1a1a1a;border-radius:2px;margin-bottom:8px;"><div style="height:100%;width:${pct}%;background:${colorBar};border-radius:2px;"></div></div>
+        ${nombresHtml}
+      </div>`;
+    });
+    diasHtml+=`<div class="card" style="margin-bottom:14px;">
+      <div class="card-header" style="background:${esHoy?"rgba(57,211,83,0.05)":""};">
+        <div class="card-title" style="color:${esHoy?"var(--accent)":""};">${esHoy?"📍 ":""}${nombre_dia} <span style="font-size:13px;font-weight:400;color:#444;">${d.getDate()} de ${MESES_ES[d.getMonth()]}</span></div>
+        <div style="font-size:11px;color:#333;">${reservas.filter(r=>r.fecha===fk).length} reservas</div>
+      </div>
+      ${slotsHtml}
+    </div>`;
+  });
+
+  return `<div class="page">
+    <div class="topbar">
+      <div><div class="eyebrow">Semana actual</div><div class="page-title">Agenda</div></div>
+      <button class="btn btn-blue" onclick="navigator.clipboard.writeText('${linkAgenda}').then(()=>toast('Link copiado 📋','blue'))">🔗 Link alumnos</button>
+    </div>
+    <div style="background:rgba(0,196,204,0.04);border:1px solid rgba(0,196,204,0.12);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#555;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <span>📲 Compartí este link con los alumnos para que reserven sus turnos</span>
+      <span style="font-family:monospace;color:#00c4cc;font-size:11px;">...?agenda=1</span>
+    </div>
+    ${diasHtml||`<div class="empty">No hay horarios configurados</div>`}
+  </div>`;
 }
 
 boot();
