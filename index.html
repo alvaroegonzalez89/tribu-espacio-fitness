@@ -1683,7 +1683,6 @@ function seedReservasHorariosFijos(alumnoId, alumnoNombre){
   // Solo si el alumno NO tiene ninguna reserva esta semana todavía
 }
 
-function fechaKey(d){ return d.toISOString().slice(0,10); }
 function getLunesDe(fecha){
   const d=new Date(fecha); d.setHours(0,0,0,0);
   const dow=d.getDay(); d.setDate(d.getDate()-(dow===0?6:dow-1)); return d;
