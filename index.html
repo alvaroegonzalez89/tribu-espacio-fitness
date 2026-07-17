@@ -1899,7 +1899,6 @@ function renderAgendaAdmin(){
   const semanaLbl=offset===0?"Esta semana":offset===1?"Próxima semana":`Semana del ${lunesBase.getDate()} de ${MESES_ES2[lunesBase.getMonth()]}`;
   const linkAgenda=`${window.location.origin}${window.location.pathname}?agenda=1`;
   const horariosUnicos=[...new Set(HORARIOS_FIJOS.map(h=>h.hora))].sort();
-  const horariosUnicos=[...new Set(HORARIOS_FIJOS.map(h=>h.hora))].sort();
 
   // Header grilla
   let headerHtml=`<div style="padding:10px 12px;font-size:11px;color:#555;font-weight:700;text-transform:uppercase;border-bottom:2px solid rgba(255,255,255,0.12);border-right:2px solid rgba(255,255,255,0.1);background:var(--surface2);"></div>`;
