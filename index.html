@@ -1745,7 +1745,7 @@ window.renderAgendaAlumno=function(){
     const d=new Date(lunesBase); d.setDate(lunesBase.getDate()+i);
     dias.push(d);
   }
-  const cantMax=a.plan&&a.plan.includes("3 veces")?3:2;
+  const cantMax=a.plan&&a.plan.includes("3 veces")?4:3; // +1 día de flexibilidad por feriados
   const resAlumnoSemana=reservasAlumnoSemana(a.nombre, lunesBase);
   const limite=resAlumnoSemana.length>=cantMax;
   const semanaLbl=offset===0?"Esta semana":offset===1?"Próxima semana":`Semana ${offset+1}`;
@@ -1812,7 +1812,7 @@ window.renderAgendaAlumno=function(){
   let misResHtml="";
   if(resAlumnoSemana.length){
     misResHtml=`<div class="ag-mis-res">
-      <div class="ag-mis-title">Mis turnos esta semana — ${resAlumnoSemana.length}/${cantMax}</div>
+      <div class="ag-mis-title">Mis turnos esta semana — ${resAlumnoSemana.length}/${cantMax} (incluye día extra)</div>
       ${resAlumnoSemana.sort((a,b)=>a.fecha.localeCompare(b.fecha)).map(r=>{
         const fd=new Date(r.fecha+'T00:00:00');
         return `<div class="ag-mi-item"><span>${DIAS_ES2[fd.getDay()]} ${r.horario.split(' ')[1]}</span><span style="color:#39d353;">✓ Reservado</span></div>`;
@@ -1823,7 +1823,7 @@ window.renderAgendaAlumno=function(){
   document.querySelector(".ag-body").innerHTML=`
     ${alumnoBar(a)}
     ${misResHtml}
-    ${limite?`<div class="ag-limite">⚠️ Ya tenés ${cantMax} turnos reservados esta semana (límite de tu plan). Cancelá uno para cambiar.</div>`:""}
+    ${limite?`<div class="ag-limite">⚠️ Ya usaste los ${cantMax} turnos disponibles esta semana. Cancelá uno para cambiar.</div>`:""}
     <div class="ag-semana-nav">
       <button class="ag-nav-btn" onclick="cambiarSemanaAg(-1)" ${offset<=0?"disabled":""}>‹</button>
       <div class="ag-semana-lbl">${semanaLbl}</div>
@@ -1849,29 +1849,35 @@ function alumnoBar(a){
 
 window.seedSemanaActual=async function(){
   const hoyD=new Date(); hoyD.setHours(0,0,0,0);
-  const lunesBase=getLunesDe(hoyD);
+  const primerDiaMes=new Date(hoyD.getFullYear(), hoyD.getMonth(), 1);
+  const ultimoDiaMes=new Date(hoyD.getFullYear(), hoyD.getMonth()+1, 0);
+  const DIAS_IDX={"Lunes":0,"Martes":1,"Miércoles":2,"Jueves":3,"Viernes":4};
   let count=0;
+
   for(const alumno of alumnos){
     if(!alumno.activo) continue;
     const horariosList=(alumno.horarios&&alumno.horarios.length)?alumno.horarios:(alumno.horario?[alumno.horario]:[]);
-    for(const hkey of horariosList){
-      const [diaNombre]=hkey.split(' ');
-      // Encontrar el próximo día de esa semana
-      const DIAS_IDX={Lunes:0,Martes:1,"Miércoles":2,Jueves:3,Viernes:4};
-      const idx=DIAS_IDX[diaNombre];
-      if(idx===undefined) continue;
-      const fechaDia=new Date(lunesBase); fechaDia.setDate(lunesBase.getDate()+idx);
-      if(fechaDia<hoyD) continue; // no seeding past days
-      const fk=fechaKey(fechaDia);
-      // Solo si no existe ya esa reserva
-      const yaExiste=reservas.find(r=>r.fecha===fk&&r.horario===hkey&&r.alumnoNombre===alumno.nombre);
-      if(!yaExiste){
-        await addDoc(reservasCol,{fecha:fk, horario:hkey, alumnoNombre:alumno.nombre, alumnoId:alumno.id, ts:Date.now(), auto:true});
-        count++;
+    // Recorrer todas las semanas del mes
+    const lunes=getLunesDe(primerDiaMes);
+    while(lunes<=ultimoDiaMes){
+      for(const hkey of horariosList){
+        const [diaNombre]=hkey.split(' ');
+        const idx=DIAS_IDX[diaNombre];
+        if(idx===undefined) continue;
+        const fechaDia=new Date(lunes); fechaDia.setDate(lunes.getDate()+idx);
+        // Solo días dentro del mes y no pasados
+        if(fechaDia<hoyD || fechaDia.getMonth()!==hoyD.getMonth()) continue;
+        const fk=fechaKey(fechaDia);
+        const yaExiste=reservas.find(r=>r.fecha===fk&&r.horario===hkey&&r.alumnoNombre===alumno.nombre);
+        if(!yaExiste){
+          await addDoc(reservasCol,{fecha:fk, horario:hkey, alumnoNombre:alumno.nombre, alumnoId:alumno.id, ts:Date.now(), auto:true});
+          count++;
+        }
       }
+      lunes.setDate(lunes.getDate()+7); // siguiente semana
     }
   }
-  toast(`✓ ${count} turnos cargados para esta semana`,"ok");
+  toast(`✓ ${count} turnos cargados para ${new Date().toLocaleString('es-AR',{month:'long'})}`, "ok");
 }
 
 window.hacerReserva=async function(fecha, horario, alumnoNombre, alumnoId){
@@ -1963,7 +1969,7 @@ function renderAgendaAdmin(){
         <button class="btn btn-ghost" onclick="window._adminOffset=Math.max(0,(window._adminOffset||0)-1);document.getElementById('main-content').innerHTML=renderAgendaAdmin();" ${offset<=0?"style='opacity:0.3;cursor:default'":""}>‹</button>
         <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.5px;color:${offset===0?"var(--accent)":"#ccc"};min-width:120px;text-align:center;">${semanaLbl}</span>
         <button class="btn btn-ghost" onclick="window._adminOffset=Math.min(4,(window._adminOffset||0)+1);document.getElementById('main-content').innerHTML=renderAgendaAdmin();">›</button>
-        <button class="btn btn-success btn-sm" onclick="seedSemanaActual()">⚡ Turnos fijos</button>
+        <button class="btn btn-success btn-sm" onclick="seedSemanaActual()">⚡ Cargar mes</button>
         <button class="btn btn-blue btn-sm" onclick="navigator.clipboard.writeText('${linkAgenda}').then(()=>toast('Link copiado 📋','blue'))">🔗 Link alumnos</button>
       </div>
     </div>
