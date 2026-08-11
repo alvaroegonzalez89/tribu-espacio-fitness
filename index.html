@@ -274,6 +274,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
       <div class="fg"><label class="fl">Email</label><input class="fi" id="f-email" placeholder="juan@email.com"/></div>
       <div class="fg"><label class="fl">Teléfono</label><input class="fi" id="f-tel" placeholder="1123456789"/></div>
     </div>
+    <div class="fg"><label class="fl">DNI <span style="color:#444;font-size:9px;">Sin puntos ni espacios</span></label><input class="fi" id="f-dni" placeholder="Ej: 35123456" type="number"/></div>
     <div class="frow">
       <div class="fg"><label class="fl">Plan</label>
         <select class="fi" id="f-plan" onchange="actualizarMontoSegunPlan()">
@@ -1095,9 +1096,10 @@ function mostrarFormularioInscripcion(){
     <div class="form-body">
       <div class="fg"><label class="fl"><span class="step-num">1</span>Nombre completo *</label><input class="fi" id="ins-nombre" placeholder="Juan Pérez"/></div>
       <div class="fg"><label class="fl"><span class="step-num">2</span>Teléfono *</label><input class="fi" id="ins-tel" placeholder="1123456789" type="tel"/></div>
+      <div class="fg"><label class="fl"><span class="step-num">3</span>DNI * <span style="font-size:9px;color:#555;font-weight:400;">Sin puntos ni espacios</span></label><input class="fi" id="ins-dni" placeholder="Ej: 35123456" type="number"/></div>
       <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="ins-email" placeholder="juan@email.com" type="email"/></div>
       <div class="fg">
-        <label class="fl"><span class="step-num">3</span>Elegí tu plan</label>
+        <label class="fl"><span class="step-num">4</span>Elegí tu plan</label>
         <div class="plan-cards">
           <label class="plan-card selected" onclick="seleccionarPlanForm('2 veces/semana — $50.000',this)">
             <input type="radio" name="ins-plan" value="2 veces/semana — $50.000" checked/>
@@ -1114,7 +1116,7 @@ function mostrarFormularioInscripcion(){
         </div>
       </div>
       <div class="fg">
-        <label class="fl"><span class="step-num">4</span>Elegí tus días y horarios</label>
+        <label class="fl"><span class="step-num">5</span>Elegí tus días y horarios</label>
         <div class="aviso-cupos">💪 Solo hacemos <strong>Entrenamiento Personalizado</strong>. Los cupos se actualizan en tiempo real.</div>
       </div>
       <div id="ins-horarios-wrap"></div>
@@ -1143,6 +1145,7 @@ window.enviarInscripcion=async function(){
   const monto=plan.includes("3 veces")?60000:50000;
   const data={
     nombre, telefono:tel,
+    dni:document.getElementById("ins-dni")?.value.trim()||"",
     email:document.getElementById("ins-email").value.trim(),
     horario:horariosElegidos[0],
     horarios:horariosElegidos,
@@ -1463,6 +1466,7 @@ window.abrirEditar=function(id){
   document.getElementById("f-tel").value=a.telefono||"";
   document.getElementById("f-plan").value=a.plan||"2 veces/semana — $50.000";
   document.getElementById("f-monto").value=a.monto||"";
+  document.getElementById("f-dni").value=a.dni||"";
   activoForm=!!a.activo; actualizarToggle();
   const horarios_vals = a.horarios||[];
   // retrocompat: si tiene horario viejo (string), lo convertimos
@@ -1540,6 +1544,7 @@ window.guardarAlumno=async function(){
     nombre, monto:Number(monto), activo:activoForm,
     email:document.getElementById("f-email").value.trim(),
     telefono:document.getElementById("f-tel").value.trim(),
+    dni:document.getElementById("f-dni").value.trim(),
     plan,
     horario:horarios_sel[0]||"",
     horarios:horarios_sel
@@ -1712,9 +1717,9 @@ function mostrarAgendaPublica(){
     </div>
     <div class="ag-body">
       <div class="ag-login-card">
-        <div class="ag-login-title">¿Quién sos?</div>
-        <div class="ag-login-sub">Ingresá tu nombre para ver y reservar turnos</div>
-        <input class="ag-fi" id="ag-nombre-input" placeholder="Tu nombre completo" onkeydown="if(event.key==='Enter') buscarAlumnoAgenda()"/>
+        <div class="ag-login-title">Ingresá tu DNI</div>
+        <div class="ag-login-sub">Usá el mismo DNI que registraste al inscribirte</div>
+        <input class="ag-fi" id="ag-dni-input" placeholder="Ej: 35123456" type="number" onkeydown="if(event.key==='Enter') buscarAlumnoAgenda()"/>
         <button class="ag-btn" onclick="buscarAlumnoAgenda()">Ver mis turnos →</button>
         <div class="ag-error" id="ag-login-error"></div>
       </div>
@@ -1725,11 +1730,11 @@ function mostrarAgendaPublica(){
 }
 
 window.buscarAlumnoAgenda=function(){
-  const nombre=document.getElementById("ag-nombre-input").value.trim();
+  const dni=document.getElementById("ag-dni-input").value.trim();
   const errEl=document.getElementById("ag-login-error");
-  if(!nombre){ errEl.textContent="Ingresá tu nombre"; return; }
-  const encontrado=alumnos.find(a=>a.activo&&a.nombre.toLowerCase().includes(nombre.toLowerCase()));
-  if(!encontrado){ errEl.textContent="No te encontramos como socio activo. Verificá tu nombre."; return; }
+  if(!dni){ errEl.textContent="Ingresá tu DNI"; return; }
+  const encontrado=alumnos.find(a=>a.activo&&String(a.dni||"").replace(/\D/g,"")===dni.replace(/\D/g,""));
+  if(!encontrado){ errEl.textContent="DNI no encontrado. Verificá el número o contactá al gimnasio."; return; }
   window._agAlumno=encontrado;
   renderAgendaAlumno();
 }
@@ -1812,7 +1817,7 @@ window.renderAgendaAlumno=function(){
   let misResHtml="";
   if(resAlumnoSemana.length){
     misResHtml=`<div class="ag-mis-res">
-      <div class="ag-mis-title">Mis turnos esta semana — ${resAlumnoSemana.length}/${cantMax} (incluye día extra)</div>
+      <div class="ag-mis-title">Mis turnos esta semana</div>
       ${resAlumnoSemana.sort((a,b)=>a.fecha.localeCompare(b.fecha)).map(r=>{
         const fd=new Date(r.fecha+'T00:00:00');
         return `<div class="ag-mi-item"><span>${DIAS_ES2[fd.getDay()]} ${r.horario.split(' ')[1]}</span><span style="color:#39d353;">✓ Reservado</span></div>`;
