@@ -1949,32 +1949,35 @@ function renderAgendaAdmin(){
       const colorBar=libres<=0?"#ff5050":libres===1?"#ff8c00":"#39d353";
       const pct=Math.round((resSlot.length/hf.cupos)*100);
       const nombresHtml=resSlot.map(r=>`
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;gap:4px;">
-          <div style="display:flex;align-items:center;gap:5px;min-width:0;">
-            <div style="width:18px;height:18px;border-radius:50%;background:${avatarColor(r.alumnoNombre)};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;">${r.alumnoNombre[0]}</div>
-            <span style="font-size:11px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:75px;">${r.alumnoNombre.split(' ')[0]}</span>
-          </div>
-          <button onclick="quitarReservaAdmin('${r.id}')" style="background:rgba(255,80,80,0.12);border:none;border-radius:4px;color:#ff5050;font-size:9px;padding:2px 5px;cursor:pointer;flex-shrink:0;font-family:'Outfit',sans-serif;" title="Quitar">✕</button>
+        <div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
+          <div style="width:18px;height:18px;border-radius:50%;background:${avatarColor(r.alumnoNombre)};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;">${r.alumnoNombre[0]}</div>
+          <span style="font-size:11px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">${r.alumnoNombre.split(' ')[0]}</span>
         </div>`).join("");
-      // Lista de alumnos no anotados en este slot para agregar
       const alumnosDisponibles=alumnos.filter(a=>a.activo&&!resSlot.find(r=>r.alumnoNombre===a.nombre));
       const optsAlumnos=alumnosDisponibles.map(a=>`<option value="${a.id}|${a.nombre}">${a.nombre}</option>`).join("");
       const slotId=`${fk}_${hkey.replace(/ /g,'_')}`;
       rowsHtml+=`<div style="border:1px solid rgba(255,255,255,0.12);padding:8px;min-height:60px;background:${esHoy?"rgba(57,211,83,0.04)":""};">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
           <span style="font-size:10px;font-weight:700;color:${colorBar};">${resSlot.length}/${hf.cupos}</span>
-          ${libres>0?`<button onclick="toggleAgregarAdmin('${slotId}')" style="background:rgba(57,211,83,0.1);border:1px solid rgba(57,211,83,0.25);border-radius:4px;color:#39d353;font-size:9px;padding:2px 6px;cursor:pointer;font-family:'Outfit',sans-serif;">+ Agregar</button>`:""}
+          <button onclick="toggleEditarAdmin('${slotId}')" style="background:rgba(57,211,83,0.1);border:1px solid rgba(57,211,83,0.25);border-radius:4px;color:#39d353;font-size:9px;padding:2px 6px;cursor:pointer;font-family:'Outfit',sans-serif;">✏️ Editar</button>
         </div>
         <div style="height:3px;background:#222;border-radius:2px;margin-bottom:6px;overflow:hidden;">
           <div style="height:100%;width:${pct}%;background:${colorBar};border-radius:2px;"></div>
         </div>
         ${nombresHtml||`<div style="font-size:10px;color:#2a2a2a;">Sin reservas</div>`}
-        <div id="add-${slotId}" style="display:none;margin-top:6px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;">
+        <div id="edit-${slotId}" style="display:none;margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;">
+          <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Quitar</div>
+          ${resSlot.length?resSlot.map(r=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;">
+              <span style="font-size:11px;color:#aaa;">${r.alumnoNombre.split(' ')[0]}</span>
+              <button onclick="quitarReservaAdmin('${r.id}')" style="background:rgba(255,80,80,0.12);border:none;border-radius:4px;color:#ff5050;font-size:9px;padding:2px 6px;cursor:pointer;font-family:'Outfit',sans-serif;">✕ Quitar</button>
+            </div>`).join(""):`<div style="font-size:10px;color:#333;margin-bottom:4px;">Sin reservas aún</div>`}
+          <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:7px 0 4px;">Agregar</div>
           <select id="sel-${slotId}" style="width:100%;background:#0f0f0f;border:1px solid #333;color:#ccc;padding:4px 6px;border-radius:6px;font-size:11px;font-family:'Outfit',sans-serif;margin-bottom:4px;">
             <option value="">— Elegir socio —</option>
             ${optsAlumnos}
           </select>
-          <button onclick="agregarReservaAdmin('${slotId}','${fk}','${hkey}')" style="width:100%;background:rgba(57,211,83,0.15);border:1px solid rgba(57,211,83,0.3);border-radius:6px;color:#39d353;font-size:10px;padding:4px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700;">✓ Confirmar</button>
+          <button onclick="agregarReservaAdmin('${slotId}','${fk}','${hkey}')" style="width:100%;background:rgba(57,211,83,0.15);border:1px solid rgba(57,211,83,0.3);border-radius:6px;color:#39d353;font-size:10px;padding:4px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700;">✓ Agregar</button>
         </div>
       </div>`;
     });
@@ -2010,8 +2013,8 @@ window.quitarReservaAdmin=async function(id){
   document.getElementById("main-content").innerHTML=renderAgendaAdmin();
 }
 
-window.toggleAgregarAdmin=function(slotId){
-  const el=document.getElementById("add-"+slotId);
+window.toggleEditarAdmin=function(slotId){
+  const el=document.getElementById("edit-"+slotId);
   if(el) el.style.display=el.style.display==="none"?"block":"none";
 }
 
