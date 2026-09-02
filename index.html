@@ -2031,10 +2031,12 @@ function renderAgendaAdmin(){
               <button onclick="quitarReservaAdmin('${r.id}')" style="background:rgba(255,80,80,0.12);border:none;border-radius:4px;color:#ff5050;font-size:9px;padding:2px 6px;cursor:pointer;font-family:'Outfit',sans-serif;">✕ Quitar</button>
             </div>`).join(""):`<div style="font-size:10px;color:#333;margin-bottom:4px;">Sin reservas aún</div>`}
           <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:7px 0 4px;">Agregar</div>
-          <select id="sel-${slotId}" style="width:100%;background:#0f0f0f;border:1px solid #333;color:#ccc;padding:4px 6px;border-radius:6px;font-size:11px;font-family:'Outfit',sans-serif;margin-bottom:4px;">
+          <select id="sel-${slotId}" onchange="toggleOtroAdmin('${slotId}',this.value)" style="width:100%;background:#0f0f0f;border:1px solid #333;color:#ccc;padding:4px 6px;border-radius:6px;font-size:11px;font-family:'Outfit',sans-serif;margin-bottom:4px;">
             <option value="">— Elegir socio —</option>
             ${optsAlumnos}
+            <option value="__otro__">✏️ Otro (no es socio)...</option>
           </select>
+          <input id="otro-${slotId}" placeholder="Nombre completo" style="display:none;width:100%;background:#0f0f0f;border:1px solid #555;color:#f0f0f0;padding:5px 8px;border-radius:6px;font-size:11px;font-family:'Outfit',sans-serif;margin-bottom:4px;outline:none;"/>
           <button onclick="agregarReservaAdmin('${slotId}','${fk}','${hkey}')" style="width:100%;background:rgba(57,211,83,0.15);border:1px solid rgba(57,211,83,0.3);border-radius:6px;color:#39d353;font-size:10px;padding:4px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:700;">✓ Agregar</button>
         </div>
       </div>`;
@@ -2078,10 +2080,22 @@ window.toggleEditarAdmin=function(slotId){
 
 window.agregarReservaAdmin=async function(slotId, fecha, horario){
   const sel=document.getElementById("sel-"+slotId);
-  if(!sel||!sel.value){ toast("Elegí un socio","err"); return; }
-  const [alumnoId, alumnoNombre]=sel.value.split("|");
+  if(!sel||!sel.value){ toast("Elegí un socio o escribí un nombre","err"); return; }
+  let alumnoId="externo", alumnoNombre="";
+  if(sel.value==="__otro__"){
+    const otroinput=document.getElementById("otro-"+slotId);
+    alumnoNombre=(otroinput?.value||"").trim();
+    if(!alumnoNombre){ toast("Escribí el nombre","err"); return; }
+  } else {
+    [alumnoId, alumnoNombre]=sel.value.split("|");
+  }
   await addDoc(reservasCol,{fecha, horario, alumnoNombre, alumnoId, ts:Date.now(), manual:true});
   document.getElementById("main-content").innerHTML=renderAgendaAdmin();
+}
+
+window.toggleOtroAdmin=function(slotId, val){
+  const el=document.getElementById("otro-"+slotId);
+  if(el) el.style.display=val==="__otro__"?"block":"none";
 }
 boot();
 </script>
