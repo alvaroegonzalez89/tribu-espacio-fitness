@@ -1910,7 +1910,7 @@ function alumnoBar(a){
   </div>`;
 }
 
-window.seedSemanaActual=async function(){
+window.seedSemanaActual=async function(soloNuevos=false){
   const hoyD=new Date(); hoyD.setHours(0,0,0,0);
   const primerDiaMes=new Date(hoyD.getFullYear(), hoyD.getMonth(), 1);
   const ultimoDiaMes=new Date(hoyD.getFullYear(), hoyD.getMonth()+1, 0);
@@ -1920,7 +1920,6 @@ window.seedSemanaActual=async function(){
   for(const alumno of alumnos){
     if(!alumno.activo) continue;
     const horariosList=(alumno.horarios&&alumno.horarios.length)?alumno.horarios:(alumno.horario?[alumno.horario]:[]);
-    // Recorrer todas las semanas del mes
     const lunes=getLunesDe(primerDiaMes);
     while(lunes<=ultimoDiaMes){
       for(const hkey of horariosList){
@@ -1928,19 +1927,33 @@ window.seedSemanaActual=async function(){
         const idx=DIAS_IDX[diaNombre];
         if(idx===undefined) continue;
         const fechaDia=new Date(lunes); fechaDia.setDate(lunes.getDate()+idx);
-        // Solo días dentro del mes y no pasados
         if(fechaDia<hoyD || fechaDia.getMonth()!==hoyD.getMonth()) continue;
         const fk=fechaKey(fechaDia);
+        // Siempre respeta lo existente — nunca sobreescribe
         const yaExiste=reservas.find(r=>r.fecha===fk&&r.horario===hkey&&r.alumnoNombre===alumno.nombre);
         if(!yaExiste){
           await addDoc(reservasCol,{fecha:fk, horario:hkey, alumnoNombre:alumno.nombre, alumnoId:alumno.id, ts:Date.now(), auto:true});
           count++;
         }
       }
-      lunes.setDate(lunes.getDate()+7); // siguiente semana
+      lunes.setDate(lunes.getDate()+7);
     }
   }
-  toast(`✓ ${count} turnos cargados para ${new Date().toLocaleString('es-AR',{month:'long'})}`, "ok");
+  const mesNombre=new Date().toLocaleString('es-AR',{month:'long'});
+  if(count>0){
+    toast(`✓ ${count} turno${count!==1?"s":""} ${soloNuevos?"agregado":"cargado"}${count!==1?"s":""} para ${mesNombre}`, "ok");
+  } else {
+    toast(`✓ La agenda de ${mesNombre} ya está al día — no había nada nuevo`, "ok");
+  }
+  // Re-render para actualizar el botón
+  document.getElementById("main-content").innerHTML=renderAgendaAdmin();
+}
+
+// Detecta si el mes actual ya tiene reservas cargadas
+function mesYaCargado(){
+  const hoy=new Date();
+  const mesActual=`${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  return reservas.some(r=>r.auto && r.fecha && r.fecha.startsWith(mesActual));
 }
 
 window.hacerReserva=async function(fecha, horario, alumnoNombre, alumnoId){
@@ -2052,7 +2065,16 @@ function renderAgendaAdmin(){
         <button class="btn btn-ghost" onclick="window._adminOffset=Math.max(0,(window._adminOffset||0)-1);document.getElementById('main-content').innerHTML=renderAgendaAdmin();" ${offset<=0?"style='opacity:0.3;cursor:default'":""}>‹</button>
         <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.5px;color:${offset===0?"var(--accent)":"#ccc"};min-width:120px;text-align:center;">${semanaLbl}</span>
         <button class="btn btn-ghost" onclick="window._adminOffset=Math.min(4,(window._adminOffset||0)+1);document.getElementById('main-content').innerHTML=renderAgendaAdmin();">›</button>
-        <button class="btn btn-success btn-sm" onclick="seedSemanaActual()">⚡ Cargar mes</button>
+      ${mesYaCargado()
+        ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+            <button class="btn btn-blue btn-sm" onclick="seedSemanaActual(true)">🔄 Actualizar mes</button>
+            <span style="font-size:10px;color:#333;">Agrega socios nuevos sin tocar lo existente</span>
+           </div>`
+        : `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+            <button class="btn btn-success btn-sm" onclick="seedSemanaActual(false)">⚡ Cargar mes</button>
+            <span style="font-size:10px;color:#333;">Genera la agenda del mes por primera vez</span>
+           </div>`
+      }
         <button class="btn btn-blue btn-sm" onclick="navigator.clipboard.writeText('${linkAgenda}').then(()=>toast('Link copiado 📋','blue'))">🔗 Link alumnos</button>
       </div>
     </div>
