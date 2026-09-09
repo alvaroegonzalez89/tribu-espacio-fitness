@@ -685,7 +685,7 @@ function renderHero(){
         <div style="height:100%;width:${pct}%;background:${colorBar};border-radius:2px;"></div>
       </div>
       ${resSlot.length?`<div style="display:flex;flex-wrap:nowrap;overflow:hidden;padding-right:6px;">${avatares}${extra}</div>
-        <div style="font-size:10px;color:#444;margin-top:6px;">${resSlot.map(r=>r.alumnoNombre.split(' ')[0]).join(', ')}</div>`
+        <div style="font-size:10px;color:#444;margin-top:6px;">${resSlot.map(r=>r.alumnoNombre).join(', ')}</div>`
       :`<div style="font-size:11px;color:#2a2a2a;">Sin reservas</div>`}
     </div>`;
   }).join("");
@@ -1917,9 +1917,16 @@ window.seedSemanaActual=async function(soloNuevos=false){
   const DIAS_IDX={"Lunes":0,"Martes":1,"Miércoles":2,"Jueves":3,"Viernes":4};
   let count=0;
 
+  const mesActual=`${hoyD.getFullYear()}-${String(hoyD.getMonth()+1).padStart(2,'0')}`;
   for(const alumno of alumnos){
     if(!alumno.activo) continue;
     const horariosList=(alumno.horarios&&alumno.horarios.length)?alumno.horarios:(alumno.horario?[alumno.horario]:[]);
+    if(!horariosList.length) continue;
+    // Si el alumno ya tiene reservas este mes (auto o manual), saltearlo completamente
+    // Esto evita duplicados y respeta todos los cambios manuales
+    const tieneReservasMes=reservas.some(r=>r.alumnoNombre===alumno.nombre&&r.fecha&&r.fecha.startsWith(mesActual));
+    if(soloNuevos && tieneReservasMes) continue;
+    // Solo cargar si no tiene ninguna reserva este mes
     const lunes=getLunesDe(primerDiaMes);
     while(lunes<=ultimoDiaMes){
       for(const hkey of horariosList){
@@ -1929,7 +1936,6 @@ window.seedSemanaActual=async function(soloNuevos=false){
         const fechaDia=new Date(lunes); fechaDia.setDate(lunes.getDate()+idx);
         if(fechaDia<hoyD || fechaDia.getMonth()!==hoyD.getMonth()) continue;
         const fk=fechaKey(fechaDia);
-        // Siempre respeta lo existente — nunca sobreescribe
         const yaExiste=reservas.find(r=>r.fecha===fk&&r.horario===hkey&&r.alumnoNombre===alumno.nombre);
         if(!yaExiste){
           await addDoc(reservasCol,{fecha:fk, horario:hkey, alumnoNombre:alumno.nombre, alumnoId:alumno.id, ts:Date.now(), auto:true});
@@ -2022,7 +2028,7 @@ function renderAgendaAdmin(){
       const nombresHtml=resSlot.map(r=>`
         <div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
           <div style="width:18px;height:18px;border-radius:50%;background:${avatarColor(r.alumnoNombre)};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;">${r.alumnoNombre[0]}</div>
-          <span style="font-size:11px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">${r.alumnoNombre.split(' ')[0]}</span>
+          <span style="font-size:11px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">${r.alumnoNombre}</span>
         </div>`).join("");
       const alumnosDisponibles=alumnos.filter(a=>a.activo&&!resSlot.find(r=>r.alumnoNombre===a.nombre));
       const optsAlumnos=alumnosDisponibles.map(a=>`<option value="${a.id}|${a.nombre}">${a.nombre}</option>`).join("");
@@ -2040,7 +2046,7 @@ function renderAgendaAdmin(){
           <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Quitar</div>
           ${resSlot.length?resSlot.map(r=>`
             <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0;">
-              <span style="font-size:11px;color:#aaa;">${r.alumnoNombre.split(' ')[0]}</span>
+              <span style="font-size:11px;color:#aaa;">${r.alumnoNombre}</span>
               <button onclick="quitarReservaAdmin('${r.id}')" style="background:rgba(255,80,80,0.12);border:none;border-radius:4px;color:#ff5050;font-size:9px;padding:2px 6px;cursor:pointer;font-family:'Outfit',sans-serif;">✕ Quitar</button>
             </div>`).join(""):`<div style="font-size:10px;color:#333;margin-bottom:4px;">Sin reservas aún</div>`}
           <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:7px 0 4px;">Agregar</div>
