@@ -276,7 +276,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     </div>
     <div class="fg"><label class="fl">DNI <span style="color:#444;font-size:9px;">Sin puntos ni espacios</span></label><input class="fi" id="f-dni" placeholder="Ej: 35123456" type="number"/></div>
     <div class="fg"><label class="fl">Profe asignado</label>
-      <select class="fi" id="f-profe">
+      <select class="fi" id="f-profe" onchange="renderHorariosSocio(document.getElementById('f-plan').value, [])">
         <option value="gime">Profe Gime</option>
         <option value="rodo">Profe Rodo</option>
       </select>
@@ -1153,8 +1153,9 @@ function mostrarFormularioInscripcion(){
   const DIAS_FORM = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
 
   function opcionesHorarioPlan(seleccionados, idxActual){
+    const profeSelForm = document.getElementById("ins-profe")?.value || "gime";
     return DIAS_FORM.flatMap(dia =>
-      HORARIOS_FIJOS.filter(h => h.dia === dia).map(h => {
+      HORARIOS_FIJOS.filter(h => h.dia === dia && (h.profe||"gime")===profeSelForm).map(h => {
         const libres = cuposLibres(h.key);
         const yaElegidoEnOtro = seleccionados.some((v,i)=>i!==idxActual && v===h.key);
         const disabled = (libres <= 0 || yaElegidoEnOtro) ? "disabled" : "";
@@ -1241,7 +1242,7 @@ function mostrarFormularioInscripcion(){
       <div class="fg"><label class="fl"><span class="step-num">3</span>DNI * <span style="font-size:9px;color:#555;font-weight:400;">Sin puntos ni espacios</span></label><input class="fi" id="ins-dni" placeholder="Ej: 35123456" type="number"/></div>
       <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="ins-email" placeholder="juan@email.com" type="email"/></div>
       <div class="fg"><label class="fl">Profe</label>
-        <select class="fi" id="ins-profe">
+        <select class="fi" id="ins-profe" onchange="window._insHorarios=['','','']; renderHorariosFormulario();">
           <option value="gime">Profe Gime</option>
           <option value="rodo">Profe Rodo</option>
         </select>
@@ -1619,9 +1620,9 @@ window.abrirEditar=function(id){
   const fprofe=document.getElementById("f-profe"); if(fprofe) fprofe.value=a.profe||"gime";
   activoForm=!!a.activo; actualizarToggle();
   const horarios_vals = a.horarios||[];
-  // retrocompat: si tiene horario viejo (string), lo convertimos
   const vals = horarios_vals.length ? horarios_vals : (a.horario ? [a.horario] : []);
-  renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals);
+  // Render horarios filtrados por profe del alumno
+  setTimeout(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals), 50);
   document.getElementById("modal-alumno").style.display="flex";
 }
 
@@ -1646,9 +1647,10 @@ function renderHorariosSocio(plan, vals=[]){
   const esTres = plan && plan.includes("3 veces");
   const cantidad = esTres ? 3 : 2;
   const DIAS_F = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
+  const profeSelModal = document.getElementById("f-profe")?.value || "gime";
   function optsHorario(selVal, excludeKeys=[]){
     return DIAS_F.flatMap(dia =>
-      HORARIOS_FIJOS.filter(h=>h.dia===dia).map(h=>{
+      HORARIOS_FIJOS.filter(h=>h.dia===dia && (h.profe||"gime")===profeSelModal).map(h=>{
         const libres = cuposLibres(h.key);
         const esExcluido = excludeKeys.includes(h.key);
         const dis = (libres<=0 && h.key!==selVal && !esExcluido) ? "disabled" : "";
