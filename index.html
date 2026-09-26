@@ -276,7 +276,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     </div>
     <div class="fg"><label class="fl">DNI <span style="color:#444;font-size:9px;">Sin puntos ni espacios</span></label><input class="fi" id="f-dni" placeholder="Ej: 35123456" type="number"/></div>
     <div class="fg"><label class="fl">Profe asignado</label>
-      <select class="fi" id="f-profe" onchange="renderHorariosSocio(document.getElementById('f-plan').value, [])">
+      <select class="fi" id="f-profe" onchange="window._modalProfe=this.value; renderHorariosSocio(document.getElementById('f-plan').value, []);">
         <option value="gime">Profe Gime</option>
         <option value="rodo">Profe Rodo</option>
       </select>
@@ -1153,7 +1153,7 @@ function mostrarFormularioInscripcion(){
   const DIAS_FORM = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
 
   function opcionesHorarioPlan(seleccionados, idxActual){
-    const profeSelForm = document.getElementById("ins-profe")?.value || "gime";
+    const profeSelForm = window._insProfe || "gime";
     return DIAS_FORM.flatMap(dia =>
       HORARIOS_FIJOS.filter(h => h.dia === dia && (h.profe||"gime")===profeSelForm).map(h => {
         const libres = cuposLibres(h.key);
@@ -1172,6 +1172,7 @@ function mostrarFormularioInscripcion(){
 
   window._insHorarios = ["",""];
   window._insPlan = "2 veces/semana — $50.000";
+  window._insProfe = "gime";
 
   window.renderHorariosFormulario = function(){
     const cant = window._insPlan.includes("3 veces") ? 3 : 2;
@@ -1242,7 +1243,7 @@ function mostrarFormularioInscripcion(){
       <div class="fg"><label class="fl"><span class="step-num">3</span>DNI * <span style="font-size:9px;color:#555;font-weight:400;">Sin puntos ni espacios</span></label><input class="fi" id="ins-dni" placeholder="Ej: 35123456" type="number"/></div>
       <div class="fg"><label class="fl">Email (opcional)</label><input class="fi" id="ins-email" placeholder="juan@email.com" type="email"/></div>
       <div class="fg"><label class="fl">Profe</label>
-        <select class="fi" id="ins-profe" onchange="window._insHorarios=['','','']; renderHorariosFormulario();">
+        <select class="fi" id="ins-profe" onchange="window._insProfe=this.value; window._insHorarios=['','','']; renderHorariosFormulario();">
           <option value="gime">Profe Gime</option>
           <option value="rodo">Profe Rodo</option>
         </select>
@@ -1602,6 +1603,7 @@ window.abrirNuevo=function(){
   ["f-nombre","f-email","f-tel","f-monto"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("f-plan").value="2 veces/semana — $50.000";
   document.getElementById("f-monto").value="50000";
+  window._modalProfe="gime";
   activoForm=true; actualizarToggle();
   renderHorariosSocio("2 veces/semana — $50.000",[]);
   document.getElementById("modal-alumno").style.display="flex";
@@ -1617,11 +1619,11 @@ window.abrirEditar=function(id){
   document.getElementById("f-plan").value=a.plan||"2 veces/semana — $50.000";
   document.getElementById("f-monto").value=a.monto||"";
   document.getElementById("f-dni").value=a.dni||"";
+  window._modalProfe = a.profe||"gime";
   const fprofe=document.getElementById("f-profe"); if(fprofe) fprofe.value=a.profe||"gime";
   activoForm=!!a.activo; actualizarToggle();
   const horarios_vals = a.horarios||[];
   const vals = horarios_vals.length ? horarios_vals : (a.horario ? [a.horario] : []);
-  // Render horarios filtrados por profe del alumno
   setTimeout(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals), 50);
   document.getElementById("modal-alumno").style.display="flex";
 }
@@ -1647,7 +1649,7 @@ function renderHorariosSocio(plan, vals=[]){
   const esTres = plan && plan.includes("3 veces");
   const cantidad = esTres ? 3 : 2;
   const DIAS_F = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
-  const profeSelModal = document.getElementById("f-profe")?.value || "gime";
+  const profeSelModal = document.getElementById("f-profe")?.value || window._modalProfe || "gime";
   function optsHorario(selVal, excludeKeys=[]){
     return DIAS_F.flatMap(dia =>
       HORARIOS_FIJOS.filter(h=>h.dia===dia && (h.profe||"gime")===profeSelModal).map(h=>{
