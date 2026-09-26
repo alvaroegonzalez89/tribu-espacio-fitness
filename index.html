@@ -591,10 +591,10 @@ function initApp(soloForm=false, soloAgenda=false){
     if(snap.empty){
       // Primera vez: guardar los defaults en Firestore
       for(const h of HORARIOS_DEFAULT){
-        await setDoc(doc(db,"horarios",h.key.replace(/ /g,"_")), {dia:h.dia, hora:h.hora, cupos:h.cupos, key:h.key});
+        await setDoc(doc(db,"horarios",h.key.replace(/ /g,"_")), {dia:h.dia, hora:h.hora, cupos:h.cupos, key:h.key, profe:h.profe||"gime"});
       }
     } else {
-      HORARIOS_FIJOS = snap.docs.map(d=>d.data()).sort((a,b)=>{
+      HORARIOS_FIJOS = snap.docs.map(d=>({profe:"gime",...d.data()})).sort((a,b)=>{
         const DIAS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
         const dd=DIAS.indexOf(a.dia)-DIAS.indexOf(b.dia);
         return dd!==0?dd:a.hora.localeCompare(b.hora);
@@ -1072,6 +1072,7 @@ function renderConfig(){
         <td style="font-weight:600;">${h.dia}</td>
         <td>${h.hora}</td>
         <td><input type="number" min="1" max="20" value="${h.cupos}" style="width:60px;background:#111;border:1px solid #222;color:#f0f0f0;padding:5px 8px;border-radius:7px;font-size:13px;font-family:'Outfit',sans-serif;" onchange="editarCupoHorario('${h.key}',this.value)"/></td>
+        <td><select style="background:#111;border:1px solid #222;color:#f0f0f0;padding:5px 8px;border-radius:7px;font-size:12px;font-family:'Outfit',sans-serif;" onchange="editarProfeHorario('${h.key}',this.value)"><option value="gime" ${(h.profe||'gime')==='gime'?'selected':''}>Profe Gime</option><option value="rodo" ${h.profe==='rodo'?'selected':''}>Profe Rodo</option></select></td>
         <td style="font-size:12px;color:#444;">${ocupados} ocupado${ocupados!==1?"s":""}</td>
         <td>${puedeEliminar
           ? `<button class="btn btn-danger btn-sm" onclick="eliminarHorarioConfig('${h.key}')">✕ Quitar</button>`
@@ -1089,15 +1090,16 @@ function renderConfig(){
     <div class="card" style="margin-bottom:16px;">
       <div class="card-header"><div class="card-title">🗓 Horarios y cupos</div><div style="font-size:12px;color:#333;">Solo podés quitar horarios sin socios asignados</div></div>
       <table>
-        <thead><tr><th>Día</th><th>Hora</th><th>Cupos</th><th>Ocupación</th><th></th></tr></thead>
+        <thead><tr><th>Día</th><th>Hora</th><th>Cupos</th><th>Profe</th><th>Ocupación</th><th></th></tr></thead>
         <tbody>${horariosRows}</tbody>
       </table>
       <div style="padding:18px 22px;border-top:1px solid #171717;">
         <div style="font-size:11px;color:#444;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;margin-bottom:12px;">+ Agregar horario</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 80px auto;gap:10px;align-items:flex-end;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 80px 1fr auto;gap:10px;align-items:flex-end;">
           <div><label class="fl">Día</label><select class="fi" id="new-h-dia">${diaOpts}</select></div>
           <div><label class="fl">Hora</label><input class="fi" type="time" id="new-h-hora"/></div>
           <div><label class="fl">Cupos</label><input class="fi" type="number" id="new-h-cupos" value="4" min="1" max="20"/></div>
+          <div><label class="fl">Profe</label><select class="fi" id="new-h-profe"><option value="gime">Profe Gime</option><option value="rodo">Profe Rodo</option></select></div>
           <div><button class="btn btn-fire" style="width:100%;" onclick="agregarHorarioConfig()">+ Agregar</button></div>
         </div>
       </div>
@@ -1753,12 +1755,13 @@ window.agregarHorarioConfig=async function(){
   const dia=document.getElementById("new-h-dia").value;
   const horaRaw=document.getElementById("new-h-hora").value;
   const cupos=Number(document.getElementById("new-h-cupos").value||4);
+  const profe=document.getElementById("new-h-profe")?.value||"gime";
   if(!horaRaw){ toast("Elegí una hora","err"); return; }
   const hora=horaRaw.length===5?horaRaw:horaRaw+":00";
   const key=`${dia} ${hora}`;
   if(HORARIOS_FIJOS.find(h=>h.key===key)){ toast("Ese horario ya existe","err"); return; }
-  await setDoc(doc(db,"horarios",key.replace(/ /g,"_")), {dia, hora, cupos, key});
-  toast(`Horario ${key} agregado ✓`);
+  await setDoc(doc(db,"horarios",key.replace(/ /g,"_")), {dia, hora, cupos, key, profe});
+  toast(`Horario ${key} (${profe==="rodo"?"Profe Rodo":"Profe Gime"}) agregado ✓`);
 }
 
 window.eliminarHorarioConfig=async function(key){
@@ -1772,6 +1775,11 @@ window.editarCupoHorario=async function(key, valor){
   const cupos=Math.max(1,Number(valor));
   await setDoc(doc(db,"horarios",key.replace(/ /g,"_")), {cupos}, {merge:true});
   toast(`Cupo de ${key} → ${cupos}`);
+}
+
+window.editarProfeHorario=async function(key, profe){
+  await setDoc(doc(db,"horarios",key.replace(/ /g,"_")), {profe}, {merge:true});
+  toast(`${key} → ${profe==="rodo"?"Profe Rodo":"Profe Gime"} ✓`);
 }
 
 
