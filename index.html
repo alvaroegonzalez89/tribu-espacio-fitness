@@ -276,7 +276,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     </div>
     <div class="fg"><label class="fl">DNI <span style="color:#444;font-size:9px;">Sin puntos ni espacios</span></label><input class="fi" id="f-dni" placeholder="Ej: 35123456" type="number"/></div>
     <div class="fg"><label class="fl">Profe asignado</label>
-      <select class="fi" id="f-profe" onchange="renderHorariosSocio(document.getElementById('f-plan').value, [], this.value);">
+      <select class="fi" id="f-profe" onchange="window._modalProfe=this.value; renderHorariosSocio(document.getElementById('f-plan').value, [], this.value);">
         <option value="gime">Profe Gime</option>
         <option value="rodo">Profe Rodo</option>
       </select>
@@ -1655,11 +1655,11 @@ function renderHorariosSocio(plan, vals=[], profeOverride=null){
   const esTres = plan && plan.includes("3 veces");
   const cantidad = esTres ? 3 : 2;
   const DIAS_F = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
-  const profeSelModal = profeOverride || document.getElementById("f-profe")?.value || window._modalProfe || "gime";
+  const profeSelModal = profeOverride || document.getElementById("f-profe")?.value || window._modalProfe || "";
   window._modalProfe = profeSelModal; // keep in sync
   function optsHorario(selVal, excludeKeys=[]){
     return DIAS_F.flatMap(dia =>
-      HORARIOS_FIJOS.filter(h=>h.dia===dia && (h.profe||"gime")===profeSelModal).map(h=>{
+      HORARIOS_FIJOS.filter(h=>h.dia===dia && (!profeSelModal || (h.profe||"gime")===profeSelModal)).map(h=>{
         const libres = cuposLibres(h.key);
         const esExcluido = excludeKeys.includes(h.key);
         const dis = (libres<=0 && h.key!==selVal && !esExcluido) ? "disabled" : "";
