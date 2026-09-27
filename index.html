@@ -276,7 +276,7 @@ tr:hover td{background:rgba(255,255,255,0.01);}
     </div>
     <div class="fg"><label class="fl">DNI <span style="color:#444;font-size:9px;">Sin puntos ni espacios</span></label><input class="fi" id="f-dni" placeholder="Ej: 35123456" type="number"/></div>
     <div class="fg"><label class="fl">Profe asignado</label>
-      <select class="fi" id="f-profe" onchange="window._modalProfe=this.value; renderHorariosSocio(document.getElementById('f-plan').value, []);">
+      <select class="fi" id="f-profe" onchange="renderHorariosSocio(document.getElementById('f-plan').value, [], this.value);">
         <option value="gime">Profe Gime</option>
         <option value="rodo">Profe Rodo</option>
       </select>
@@ -1626,7 +1626,7 @@ window.abrirEditar=function(id){
   activoForm=!!a.activo; actualizarToggle();
   const horarios_vals = a.horarios||[];
   const vals = horarios_vals.length ? horarios_vals : (a.horario ? [a.horario] : []);
-  setTimeout(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals), 50);
+  setTimeout(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals, a.profe||"gime"), 50);
   document.getElementById("modal-alumno").style.display="flex";
 }
 
@@ -1644,14 +1644,16 @@ window.actualizarMontoSegunPlan=function(){
   const montoEl=document.getElementById("f-monto");
   if(plan.includes("2 veces")) montoEl.value="50000";
   else if(plan.includes("3 veces")) montoEl.value="60000";
-  renderHorariosSocio(plan);
+  const profeActual=document.getElementById("f-profe")?.value||window._modalProfe||"gime";
+  renderHorariosSocio(plan, [], profeActual);
 }
 
-function renderHorariosSocio(plan, vals=[]){
+function renderHorariosSocio(plan, vals=[], profeOverride=null){
   const esTres = plan && plan.includes("3 veces");
   const cantidad = esTres ? 3 : 2;
   const DIAS_F = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
-  const profeSelModal = document.getElementById("f-profe")?.value || window._modalProfe || "gime";
+  const profeSelModal = profeOverride || document.getElementById("f-profe")?.value || window._modalProfe || "gime";
+  window._modalProfe = profeSelModal; // keep in sync
   function optsHorario(selVal, excludeKeys=[]){
     return DIAS_F.flatMap(dia =>
       HORARIOS_FIJOS.filter(h=>h.dia===dia && (h.profe||"gime")===profeSelModal).map(h=>{
