@@ -1606,9 +1606,11 @@ window.abrirNuevo=function(){
   document.getElementById("f-plan").value="2 veces/semana — $50.000";
   document.getElementById("f-monto").value="50000";
   window._modalProfe="gime";
+  const fp=document.getElementById("f-profe"); if(fp) fp.value="gime";
   activoForm=true; actualizarToggle();
-  renderHorariosSocio("2 veces/semana — $50.000",[]);
   document.getElementById("modal-alumno").style.display="flex";
+  // Render DESPUÉS de mostrar el modal para que el DOM esté listo
+  requestAnimationFrame(()=>renderHorariosSocio("2 veces/semana — $50.000",[],"gime"));
 }
 
 window.abrirEditar=function(id){
@@ -1621,13 +1623,14 @@ window.abrirEditar=function(id){
   document.getElementById("f-plan").value=a.plan||"2 veces/semana — $50.000";
   document.getElementById("f-monto").value=a.monto||"";
   document.getElementById("f-dni").value=a.dni||"";
-  window._modalProfe = a.profe||"gime";
+  window._modalProfe=a.profe||"gime";
   const fprofe=document.getElementById("f-profe"); if(fprofe) fprofe.value=a.profe||"gime";
   activoForm=!!a.activo; actualizarToggle();
-  const horarios_vals = a.horarios||[];
-  const vals = horarios_vals.length ? horarios_vals : (a.horario ? [a.horario] : []);
-  setTimeout(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals, a.profe||"gime"), 50);
+  const horarios_vals=a.horarios||[];
+  const vals=horarios_vals.length?horarios_vals:(a.horario?[a.horario]:[]);
   document.getElementById("modal-alumno").style.display="flex";
+  // Render DESPUÉS de mostrar el modal — así el wrap ya existe en el DOM
+  requestAnimationFrame(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals, a.profe||"gime"));
 }
 
 window.cerrarModal=function(){ document.getElementById("modal-alumno").style.display="none"; }
@@ -1671,7 +1674,7 @@ function renderHorariosSocio(plan, vals=[], profeOverride=null){
     const label = cantidad===2 ? (i===0?"Día 1":"Día 2") : (i===0?"Día 1":i===1?"Día 2":"Día 3");
     const id = `f-horario-${i}`;
     html += `<div class="fg"><label class="fl">Horario — ${label}</label>
-      <select class="fi" id="${id}" onchange="renderHorariosSocio(document.getElementById('f-plan').value, getHorariosSeleccionados())">
+      <select class="fi" id="${id}" onchange="renderHorariosSocio(document.getElementById('f-plan').value, getHorariosSeleccionados(), window._modalProfe||'gime')">
         <option value="">— Elegí un horario —</option>
         ${optsHorario(vals[i]||"", vals.filter((_,j)=>j!==i))}
       </select>
