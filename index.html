@@ -1962,11 +1962,30 @@ window.renderAgendaAlumno=function(){
       const libres=cuposLibresAgenda(fk,hkey);
       const miRes=reservas.find(r=>r.fecha===fk&&r.horario===hkey&&r.alumnoNombre===a.nombre);
       const colorCupos=libres<=0?"ag-cupos-lleno":libres===1?"ag-cupos-bajo":"ag-cupos-ok";
+      // Profe del horario
+      const profeHorario=hf.profe||"gime";
+      const profeLabel=profeHorario==="rodo"
+        ? `<div style="font-size:9px;color:#00c4cc;font-weight:700;margin-top:2px;">Profe Rodo</div>`
+        : `<div style="font-size:9px;color:#39d353;font-weight:700;margin-top:2px;">Profe Gime</div>`;
+      // Límite de 30 min antes del turno
+      const ahoraTs=new Date();
+      const turnoTs=new Date(fk+"T"+hf.hora+":00");
+      const minsFaltantes=(turnoTs-ahoraTs)/60000;
+      const bloqueadoPorTiempo = esHoy && minsFaltantes>=0 && minsFaltantes<=30;
+      const bloqueadoPorTiempoLabel = bloqueadoPorTiempo
+        ? `<div style="font-size:9px;color:#ff8c00;margin-top:2px;">⏱ Cierra en ${Math.ceil(minsFaltantes)} min</div>`
+        : "";
       let btn="";
       if(esPasado){
         btn=`<button class="ag-btn-slot ag-btn-lleno" disabled style="opacity:0.3;">Pasado</button>`;
       } else if(miRes){
-        btn=`<button class="ag-btn-slot ag-btn-cancelar" onclick="cancelarReserva('${miRes.id}')">✓ Cancelar</button>`;
+        if(bloqueadoPorTiempo){
+          btn=`<button class="ag-btn-slot ag-btn-lleno" disabled title="No podés cancelar con menos de 30 min de anticipación">🔒 Reservado</button>`;
+        } else {
+          btn=`<button class="ag-btn-slot ag-btn-cancelar" onclick="cancelarReserva('${miRes.id}')">✓ Cancelar</button>`;
+        }
+      } else if(bloqueadoPorTiempo){
+        btn=`<button class="ag-btn-slot ag-btn-lleno" disabled title="No podés anotarte con menos de 30 min de anticipación">🔒 Cerrado</button>`;
       } else if(libres<=0){
         btn=`<button class="ag-btn-slot ag-btn-lleno" disabled>Lleno</button>`;
       } else if(limite){
@@ -1976,6 +1995,8 @@ window.renderAgendaAlumno=function(){
       }
       rowsHtml+=`<div class="ag-cell${esHoy?" hoy-col":""}${esPasado?" ":" "}" style="${esPasado?"opacity:0.4;":""}">
         ${btn}
+        ${profeLabel}
+        ${bloqueadoPorTiempoLabel}
         <div class="ag-cupos ${colorCupos}">${esPasado?"":libres<=0?"Sin cupos":`${libres} libre${libres!==1?"s":""}`}</div>
       </div>`;
     });
