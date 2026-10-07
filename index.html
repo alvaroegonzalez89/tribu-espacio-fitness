@@ -1609,8 +1609,8 @@ window.abrirNuevo=function(){
   const fp=document.getElementById("f-profe"); if(fp) fp.value="gime";
   activoForm=true; actualizarToggle();
   document.getElementById("modal-alumno").style.display="flex";
-  // Render DESPUÉS de mostrar el modal para que el DOM esté listo
-  requestAnimationFrame(()=>renderHorariosSocio("2 veces/semana — $50.000",[],"gime"));
+  window._modalProfe = "gime";
+  requestAnimationFrame(()=>requestAnimationFrame(()=>renderHorariosSocio("2 veces/semana — $50.000",[],"gime")));
 }
 
 window.abrirEditar=function(id){
@@ -1629,8 +1629,9 @@ window.abrirEditar=function(id){
   const horarios_vals=a.horarios||[];
   const vals=horarios_vals.length?horarios_vals:(a.horario?[a.horario]:[]);
   document.getElementById("modal-alumno").style.display="flex";
-  // Render DESPUÉS de mostrar el modal — así el wrap ya existe en el DOM
-  requestAnimationFrame(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals, a.profe||"gime"));
+  // Render DESPUÉS de mostrar el modal — dos frames para asegurar que el DOM esté listo
+  window._modalProfe = a.profe||"gime";
+  requestAnimationFrame(()=>requestAnimationFrame(()=>renderHorariosSocio(a.plan||"2 veces/semana — $50.000", vals, a.profe||"gime")));
 }
 
 window.cerrarModal=function(){ document.getElementById("modal-alumno").style.display="none"; }
@@ -1655,11 +1656,18 @@ function renderHorariosSocio(plan, vals=[], profeOverride=null){
   const esTres = plan && plan.includes("3 veces");
   const cantidad = esTres ? 3 : 2;
   const DIAS_F = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
-  const profeSelModal = profeOverride || document.getElementById("f-profe")?.value || window._modalProfe || "";
-  window._modalProfe = profeSelModal; // keep in sync
+  // Determine profe: use override first, then DOM, then global, then empty (show all)
+  const profeSelModal = profeOverride!=null ? profeOverride
+    : (document.getElementById("f-profe")?.value || window._modalProfe || "");
+  window._modalProfe = profeSelModal;
+  // Filter horarios by profe — if profe is set, only show matching ones
+  // Use explicit check: horarios without profe field default to "gime"
+  const horariosFiltradosModal = profeSelModal
+    ? HORARIOS_FIJOS.filter(h=>(h.profe||"gime")===profeSelModal)
+    : HORARIOS_FIJOS;
   function optsHorario(selVal, excludeKeys=[]){
     return DIAS_F.flatMap(dia =>
-      HORARIOS_FIJOS.filter(h=>h.dia===dia && (!profeSelModal || (h.profe||"gime")===profeSelModal)).map(h=>{
+      horariosFiltradosModal.filter(h=>h.dia===dia).map(h=>{
         const libres = cuposLibres(h.key);
         const esExcluido = excludeKeys.includes(h.key);
         const dis = (libres<=0 && h.key!==selVal && !esExcluido) ? "disabled" : "";
