@@ -1643,6 +1643,8 @@ function actualizarToggle(){
   document.getElementById("tog-label").style.color=activoForm?"var(--accent)":"#444";
 }
 
+window.renderHorariosSocio=function(plan,vals,profe){ renderHorariosSocio(plan,vals||[],profe||null); };
+
 window.actualizarMontoSegunPlan=function(){
   const plan=document.getElementById("f-plan").value;
   const montoEl=document.getElementById("f-monto");
