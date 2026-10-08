@@ -1660,11 +1660,16 @@ function renderHorariosSocio(plan, vals=[], profeOverride=null){
   const profeSelModal = profeOverride!=null ? profeOverride
     : (document.getElementById("f-profe")?.value || window._modalProfe || "");
   window._modalProfe = profeSelModal;
-  // Filter horarios by profe — if profe is set, only show matching ones
-  // Use explicit check: horarios without profe field default to "gime"
+  // Filter horarios by profe
+  // IMPORTANT: log to debug
+  console.log("[renderHorariosSocio] profeSelModal=", profeSelModal, "HORARIOS_FIJOS count=", HORARIOS_FIJOS.length, "with profe field:", HORARIOS_FIJOS.filter(h=>h.profe).length);
   const horariosFiltradosModal = profeSelModal
-    ? HORARIOS_FIJOS.filter(h=>(h.profe||"gime")===profeSelModal)
+    ? HORARIOS_FIJOS.filter(h=>{
+        const p = h.profe || "gime";
+        return p === profeSelModal;
+      })
     : HORARIOS_FIJOS;
+  console.log("[renderHorariosSocio] filtrados=", horariosFiltradosModal.length, horariosFiltradosModal.map(h=>h.key));
   function optsHorario(selVal, excludeKeys=[]){
     return DIAS_F.flatMap(dia =>
       horariosFiltradosModal.filter(h=>h.dia===dia).map(h=>{
